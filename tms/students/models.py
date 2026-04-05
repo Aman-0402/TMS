@@ -2,9 +2,11 @@ from django.db import models
 
 
 class Student(models.Model):
-    name = models.CharField(max_length=255)
-    email = models.EmailField()
-    phone = models.CharField(max_length=20)
+    ug_number = models.CharField(max_length=50, db_index=True)
+    name = models.CharField(max_length=100)
+    department = models.CharField(max_length=100)
+    email = models.EmailField(blank=True)
+    phone = models.CharField(max_length=20, blank=True)
     batch = models.ForeignKey(
         "batch.Batch",
         on_delete=models.CASCADE,
@@ -12,7 +14,9 @@ class Student(models.Model):
     )
     lab = models.ForeignKey(
         "labs.Lab",
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name="students",
     )
 
@@ -20,8 +24,8 @@ class Student(models.Model):
         ordering = ["name"]
         constraints = [
             models.UniqueConstraint(
-                fields=["batch", "email"],
-                name="unique_student_email_per_batch",
+                fields=["batch", "ug_number"],
+                name="unique_student_ug_number_per_batch",
             ),
         ]
 

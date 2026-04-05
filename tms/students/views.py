@@ -63,7 +63,7 @@ class StudentViewSet(AuditLogMixin, RoleScopedQuerysetMixin, viewsets.ModelViewS
             return
 
         if user.role == "TRAINER":
-            if student.lab.trainer.user_id != user.id:
+            if not student.lab or student.lab.trainer.user_id != user.id:
                 raise PermissionDenied("Trainers can only modify students in their assigned lab.")
             return
 

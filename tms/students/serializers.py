@@ -4,6 +4,7 @@ from .models import Student
 
 
 class StudentSerializer(serializers.ModelSerializer):
+    ug_number = serializers.CharField()
     batch_name = serializers.CharField(source="batch.name", read_only=True)
     lab_name = serializers.CharField(source="lab.name", read_only=True)
 
@@ -11,7 +12,9 @@ class StudentSerializer(serializers.ModelSerializer):
         model = Student
         fields = (
             "id",
+            "ug_number",
             "name",
+            "department",
             "email",
             "phone",
             "batch",
