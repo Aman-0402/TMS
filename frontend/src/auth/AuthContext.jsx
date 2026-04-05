@@ -15,12 +15,14 @@ export function AuthProvider({ children }) {
       access: response.data.access,
       refresh: response.data.refresh,
       username,
+      role: response.data.role,
     });
 
     setAuthState({
       accessToken: response.data.access,
       refreshToken: response.data.refresh,
-      user: { username },
+      role: response.data.role,
+      user: { username, role: response.data.role },
     });
   };
 
@@ -29,6 +31,7 @@ export function AuthProvider({ children }) {
     setAuthState({
       accessToken: null,
       refreshToken: null,
+      role: null,
       user: null,
     });
   };
@@ -37,6 +40,7 @@ export function AuthProvider({ children }) {
     () => ({
       accessToken: authState.accessToken,
       refreshToken: authState.refreshToken,
+      role: authState.role,
       isAuthenticated: Boolean(authState.accessToken),
       user: authState.user,
       login,

@@ -1,14 +1,12 @@
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../auth/AuthContext";
+import { getRole } from "../utils/auth";
 
-const navigationItems = [
+const commonNavigationItems = [
   { to: "/", label: "Dashboard", end: true },
   { to: "/batches", label: "Batches" },
   { to: "/students", label: "Students" },
-  { to: "/trainers", label: "Trainers" },
-  { to: "/attendance", label: "Attendance" },
-  { to: "/results", label: "Results" },
 ];
 
 const pageTitles = {
@@ -24,6 +22,7 @@ function DashboardLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { logout, user } = useAuth();
+  const role = getRole();
   const pageTitle = pageTitles[location.pathname] || "TMS";
 
   const handleLogout = () => {
@@ -41,7 +40,7 @@ function DashboardLayout() {
         </div>
 
         <nav className="nav flex-column gap-2 mt-4">
-          {navigationItems.map((item) => (
+          {commonNavigationItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -53,6 +52,39 @@ function DashboardLayout() {
               {item.label}
             </NavLink>
           ))}
+
+          {role === "ADMIN" ? (
+            <NavLink
+              to="/trainers"
+              className={({ isActive }) =>
+                `nav-link nav-item-link ${isActive ? "active" : ""}`
+              }
+            >
+              Trainers
+            </NavLink>
+          ) : null}
+
+          {role === "MANAGER" ? (
+            <NavLink
+              to="/attendance"
+              className={({ isActive }) =>
+                `nav-link nav-item-link ${isActive ? "active" : ""}`
+              }
+            >
+              Attendance
+            </NavLink>
+          ) : null}
+
+          {role === "TRAINER" ? (
+            <NavLink
+              to="/results"
+              className={({ isActive }) =>
+                `nav-link nav-item-link ${isActive ? "active" : ""}`
+              }
+            >
+              Results
+            </NavLink>
+          ) : null}
         </nav>
 
         <div className="sidebar-footer mt-auto pt-4">
@@ -70,7 +102,7 @@ function DashboardLayout() {
           <div className="d-flex align-items-center gap-3">
             <div className="text-end">
               <div className="fw-semibold text-dark">{user?.username || "Authenticated User"}</div>
-              <div className="small text-muted">JWT Session</div>
+              <div className="small text-muted">{role || "JWT Session"}</div>
             </div>
             <div className="user-avatar">
               {(user?.username || "AU").slice(0, 2).toUpperCase()}
