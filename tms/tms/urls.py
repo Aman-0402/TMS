@@ -18,12 +18,13 @@ from django.contrib import admin
 from django.urls import include, path
 from rest_framework_simplejwt.views import TokenRefreshView
 
-from accounts.views import CustomLoginView
+from accounts.views import CustomLoginView, RegisterView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('tms.api_urls')),
     path('api/', include('students.urls')),
+    path('api/register/', RegisterView.as_view()),
     path('api/login/', CustomLoginView.as_view()),
     path('api/token/', CustomLoginView.as_view()),
     path('api/token/refresh/', TokenRefreshView.as_view()),

@@ -6,6 +6,7 @@ import DashboardPage from "./pages/DashboardPage";
 import Login from "./pages/Login";
 import ModulePage from "./pages/ModulePage";
 import NotFoundPage from "./pages/NotFoundPage";
+import RegisterPage from "./pages/RegisterPage";
 import StudentsPage from "./pages/StudentsPage";
 import PrivateRoute from "./routes/PrivateRoute";
 
@@ -13,6 +14,7 @@ function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<RegisterPage />} />
 
       <Route
         path="/"

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../auth/AuthContext";
 
@@ -100,6 +100,11 @@ function LoginPage() {
               )}
             </button>
           </form>
+
+          <div className="text-center mt-4">
+            <span className="text-secondary">Need an account? </span>
+            <Link to="/register">Register</Link>
+          </div>
         </div>
       </div>
     </div>
