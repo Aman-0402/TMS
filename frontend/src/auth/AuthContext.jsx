@@ -9,7 +9,7 @@ export function AuthProvider({ children }) {
   const [authState, setAuthState] = useState(getStoredAuth);
 
   const login = async ({ username, password }) => {
-    const response = await API.post("token/", { username, password });
+    const response = await API.post("login/", { username, password });
 
     storeAuth({
       access: response.data.access,

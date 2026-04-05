@@ -31,7 +31,7 @@ function LoginPage() {
       await login(formData);
       navigate(redirectTo, { replace: true });
     } catch (loginError) {
-      setError("Invalid username or password.");
+      setError(loginError.response?.data?.error || "Invalid username or password.");
     } finally {
       setIsSubmitting(false);
     }
