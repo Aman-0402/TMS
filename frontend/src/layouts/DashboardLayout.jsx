@@ -6,7 +6,9 @@ import { getRole } from "../utils/auth";
 const pageTitles = {
   "/": "Dashboard",
   "/audit-logs": "Audit Logs",
+  "/courses": "Courses",
   "/batches": "Batches",
+  "/create-batch": "Create Batch",
   "/students": "Students",
   "/students/upload": "Student Upload",
   "/trainers": "Trainers",
@@ -25,6 +27,8 @@ function DashboardLayout() {
     ...(role === "ADMIN" ? [{ to: "/audit-logs", label: "Audit Logs" }] : []),
     ...(role === "ADMIN"
       ? [
+          { to: "/courses", label: "Courses" },
+          { to: "/create-batch", label: "Create Batch" },
           { to: "/batches", label: "Batches" },
           { to: "/students", label: "Students" },
           { to: "/students/upload", label: "Student Upload" },

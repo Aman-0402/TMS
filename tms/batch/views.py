@@ -3,9 +3,18 @@ from rest_framework.permissions import IsAuthenticated
 
 from accounts.mixins import AuditLogMixin, RoleScopedQuerysetMixin
 from accounts.models import AuditLog
+from accounts.permissions import IsAdmin
 
-from .models import Batch
-from .serializers import BatchSerializer
+from .models import Batch, Course
+from .serializers import BatchSerializer, CourseSerializer
+
+
+class CourseViewSet(AuditLogMixin, viewsets.ModelViewSet):
+    serializer_class = CourseSerializer
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def get_queryset(self):
+        return Course.objects.all().order_by("name", "certification")
 
 
 class BatchViewSet(AuditLogMixin, RoleScopedQuerysetMixin, viewsets.ModelViewSet):

@@ -3,6 +3,7 @@ import { Route, Routes } from "react-router-dom";
 import DashboardLayout from "./layouts/DashboardLayout";
 import AuditLogsPage from "./pages/AuditLogsPage";
 import BatchesPage from "./pages/BatchesPage";
+import CoursesPage from "./pages/CoursesPage";
 import DashboardPage from "./pages/DashboardPage";
 import Login from "./pages/Login";
 import ModulePage from "./pages/ModulePage";
@@ -37,7 +38,23 @@ function App() {
           }
         />
         <Route
+          path="courses"
+          element={
+            <PrivateRoute allowedRoles={["ADMIN"]}>
+              <CoursesPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
           path="batches"
+          element={
+            <PrivateRoute allowedRoles={["ADMIN"]}>
+              <BatchesPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="create-batch"
           element={
             <PrivateRoute allowedRoles={["ADMIN"]}>
               <BatchesPage />
