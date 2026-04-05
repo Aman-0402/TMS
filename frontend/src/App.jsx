@@ -6,6 +6,7 @@ import DashboardPage from "./pages/DashboardPage";
 import Login from "./pages/Login";
 import ModulePage from "./pages/ModulePage";
 import NotFoundPage from "./pages/NotFoundPage";
+import ApprovalPage from "./pages/ApprovalPage";
 import RegisterPage from "./pages/RegisterPage";
 import StudentsPage from "./pages/StudentsPage";
 import PrivateRoute from "./routes/PrivateRoute";
@@ -25,15 +26,39 @@ function App() {
         }
       >
         <Route index element={<DashboardPage />} />
-        <Route path="batches" element={<BatchesPage />} />
-        <Route path="students" element={<StudentsPage />} />
+        <Route
+          path="batches"
+          element={
+            <PrivateRoute allowedRoles={["ADMIN"]}>
+              <BatchesPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="students"
+          element={
+            <PrivateRoute allowedRoles={["ADMIN", "MANAGER"]}>
+              <StudentsPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="approvals"
+          element={
+            <PrivateRoute allowedRoles={["ADMIN", "MANAGER"]}>
+              <ApprovalPage />
+            </PrivateRoute>
+          }
+        />
         <Route
           path="trainers"
           element={
-            <ModulePage
-              title="Trainers"
-              description="Assign trainers to batches and manage trainer-related workflows."
-            />
+            <PrivateRoute allowedRoles={["ADMIN"]}>
+              <ModulePage
+                title="Trainers"
+                description="Assign trainers to batches and manage trainer-related workflows."
+              />
+            </PrivateRoute>
           }
         />
         <Route
@@ -48,19 +73,23 @@ function App() {
         <Route
           path="attendance"
           element={
-            <ModulePage
-              title="Attendance"
-              description="Capture student and trainer attendance records by date."
-            />
+            <PrivateRoute allowedRoles={["ADMIN", "MANAGER"]}>
+              <ModulePage
+                title="Attendance"
+                description="Capture student and trainer attendance records by date."
+              />
+            </PrivateRoute>
           }
         />
         <Route
           path="results"
           element={
-            <ModulePage
-              title="Results"
-              description="Review scores, totals, and pass or fail status."
-            />
+            <PrivateRoute allowedRoles={["ADMIN", "MANAGER", "TRAINER"]}>
+              <ModulePage
+                title="Results"
+                description="Review scores, totals, and pass or fail status."
+              />
+            </PrivateRoute>
           }
         />
         <Route

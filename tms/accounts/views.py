@@ -1,9 +1,15 @@
 from rest_framework import generics, permissions, status
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 
 from .models import User
-from .serializers import CustomTokenObtainPairSerializer, RegisterSerializer
+from .serializers import (
+    CustomTokenObtainPairSerializer,
+    PendingUserSerializer,
+    RegisterSerializer,
+)
 
 
 class CustomLoginView(TokenObtainPairView):
@@ -33,4 +39,45 @@ class RegisterView(generics.CreateAPIView):
         return Response(
             {"message": "Waiting for approval"},
             status=status.HTTP_201_CREATED,
+        )
+
+
+class PendingUserListView(generics.ListAPIView):
+    serializer_class = PendingUserSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+
+        if user.role == "ADMIN":
+            allowed_roles = ["MANAGER", "TRAINER"]
+        elif user.role == "MANAGER":
+            allowed_roles = ["STUDENT"]
+        else:
+            raise PermissionDenied("You do not have permission to view pending approvals.")
+
+        return User.objects.filter(is_approved=False, role__in=allowed_roles).order_by("username")
+
+
+class ApproveUserView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk, *args, **kwargs):
+        target_user = User.objects.filter(pk=pk, is_approved=False).first()
+
+        if not target_user:
+            return Response(
+                {"error": "Pending user not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if request.user.role not in {"ADMIN", "MANAGER"} or not request.user.can_approve(target_user):
+            raise PermissionDenied("You do not have permission to approve this user.")
+
+        target_user.is_approved = True
+        target_user.save(update_fields=["is_approved"])
+
+        return Response(
+            {"message": f"{target_user.username} approved successfully"},
+            status=status.HTTP_200_OK,
         )

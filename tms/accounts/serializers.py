@@ -40,3 +40,10 @@ class RegisterSerializer(serializers.ModelSerializer):
             role=validated_data["role"],
             is_approved=False,
         )
+
+
+class PendingUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ("id", "username", "email", "role", "is_approved")
+        read_only_fields = fields

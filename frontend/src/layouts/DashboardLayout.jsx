@@ -1,13 +1,7 @@
-import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 
 import { useAuth } from "../auth/AuthContext";
 import { getRole } from "../utils/auth";
-
-const commonNavigationItems = [
-  { to: "/", label: "Dashboard", end: true },
-  { to: "/batches", label: "Batches" },
-  { to: "/students", label: "Students" },
-];
 
 const pageTitles = {
   "/": "Dashboard",
@@ -16,18 +10,25 @@ const pageTitles = {
   "/trainers": "Trainers",
   "/attendance": "Attendance",
   "/results": "Results",
+  "/approvals": "Approvals",
 };
 
 function DashboardLayout() {
   const location = useLocation();
-  const navigate = useNavigate();
   const { logout, user } = useAuth();
   const role = getRole();
   const pageTitle = pageTitles[location.pathname] || "TMS";
+  const navigationItems = [
+    { to: "/", label: "Dashboard", end: true },
+    ...(role === "ADMIN" ? [{ to: "/batches", label: "Batches" }, { to: "/students", label: "Students" }] : []),
+    ...(role === "MANAGER" ? [{ to: "/students", label: "Students" }, { to: "/attendance", label: "Attendance" }] : []),
+    ...(role === "TRAINER" ? [{ to: "/results", label: "Results" }] : []),
+    ...(role === "ADMIN" ? [{ to: "/trainers", label: "Trainers" }, { to: "/approvals", label: "Approvals" }] : []),
+    ...(role === "MANAGER" ? [{ to: "/approvals", label: "Approvals" }] : []),
+  ];
 
   const handleLogout = () => {
     logout();
-    localStorage.removeItem("token");
     window.location.href = "/login";
   };
 
@@ -40,9 +41,9 @@ function DashboardLayout() {
         </div>
 
         <nav className="nav flex-column gap-2 mt-4">
-          {commonNavigationItems.map((item) => (
+          {navigationItems.map((item) => (
             <NavLink
-              key={item.to}
+              key={`${item.to}-${item.label}`}
               to={item.to}
               end={item.end}
               className={({ isActive }) =>
@@ -52,39 +53,6 @@ function DashboardLayout() {
               {item.label}
             </NavLink>
           ))}
-
-          {role === "ADMIN" ? (
-            <NavLink
-              to="/trainers"
-              className={({ isActive }) =>
-                `nav-link nav-item-link ${isActive ? "active" : ""}`
-              }
-            >
-              Trainers
-            </NavLink>
-          ) : null}
-
-          {role === "MANAGER" ? (
-            <NavLink
-              to="/attendance"
-              className={({ isActive }) =>
-                `nav-link nav-item-link ${isActive ? "active" : ""}`
-              }
-            >
-              Attendance
-            </NavLink>
-          ) : null}
-
-          {role === "TRAINER" ? (
-            <NavLink
-              to="/results"
-              className={({ isActive }) =>
-                `nav-link nav-item-link ${isActive ? "active" : ""}`
-              }
-            >
-              Results
-            </NavLink>
-          ) : null}
         </nav>
 
         <div className="sidebar-footer mt-auto pt-4">

@@ -23,7 +23,7 @@ class Batch(models.Model):
         ordering = ["-created_at"]
         constraints = [
             models.CheckConstraint(
-                condition=Q(end_date__gte=F("start_date")),
+                check=Q(end_date__gte=F("start_date")),
                 name="batch_end_date_gte_start_date",
             ),
         ]

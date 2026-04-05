@@ -3,10 +3,10 @@ from django.db import models
 
 
 class Trainer(models.Model):
-    user = models.ForeignKey(
+    user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name="trainer_profiles",
+        related_name="trainer_profile",
     )
     batch = models.ForeignKey(
         "batch.Batch",
@@ -16,12 +16,6 @@ class Trainer(models.Model):
 
     class Meta:
         ordering = ["user__username"]
-        constraints = [
-            models.UniqueConstraint(
-                fields=["user", "batch"],
-                name="unique_trainer_per_batch",
-            ),
-        ]
 
     def __str__(self) -> str:
         return f"{self.user.username} - {self.batch.name}"

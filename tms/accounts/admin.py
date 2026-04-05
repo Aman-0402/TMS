@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
-from .models import User
+from .models import Manager, User
 
 
 @admin.register(User)
@@ -31,3 +31,10 @@ class CustomUserAdmin(UserAdmin):
     @admin.action(description="Approve selected users")
     def approve_users(self, request, queryset):
         queryset.update(is_approved=True)
+
+
+@admin.register(Manager)
+class ManagerAdmin(admin.ModelAdmin):
+    list_display = ("user", "batch")
+    list_select_related = ("user", "batch")
+    search_fields = ("user__username", "user__email", "batch__name")

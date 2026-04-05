@@ -24,7 +24,7 @@ class Migration(migrations.Migration):
             ],
             options={
                 'ordering': ['-created_at'],
-                'constraints': [models.CheckConstraint(condition=models.Q(('end_date__gte', models.F('start_date'))), name='batch_end_date_gte_start_date')],
+                'constraints': [models.CheckConstraint(check=models.Q(('end_date__gte', models.F('start_date'))), name='batch_end_date_gte_start_date')],
             },
         ),
     ]

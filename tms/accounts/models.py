@@ -39,3 +39,11 @@ class User(AbstractUser):
 
     def __str__(self) -> str:
         return self.get_username()
+
+
+class Manager(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    batch = models.ForeignKey("batch.Batch", on_delete=models.CASCADE)
+
+    def __str__(self):
+        return self.user.username
