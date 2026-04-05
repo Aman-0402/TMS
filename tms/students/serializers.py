@@ -1,0 +1,21 @@
+from rest_framework import serializers
+
+from .models import Student
+
+
+class StudentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Student
+        fields = ("id", "name", "email", "phone", "batch", "lab")
+        read_only_fields = ("id",)
+
+    def validate(self, attrs):
+        batch = attrs.get("batch", getattr(self.instance, "batch", None))
+        lab = attrs.get("lab", getattr(self.instance, "lab", None))
+
+        if batch and lab and lab.batch_id != batch.id:
+            raise serializers.ValidationError(
+                {"lab": "Assigned lab must belong to the same batch as the student."}
+            )
+
+        return attrs
