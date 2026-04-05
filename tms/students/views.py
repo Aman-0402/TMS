@@ -2,6 +2,7 @@ from rest_framework import viewsets
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import BasePermission, IsAuthenticated
 
+from accounts.mixins import RoleScopedQuerysetMixin
 from accounts.models import Manager
 from accounts.permissions import IsAdmin, IsManager, IsTrainer
 
@@ -14,9 +15,11 @@ class DenyAllPermission(BasePermission):
         return False
 
 
-class StudentViewSet(viewsets.ModelViewSet):
+class StudentViewSet(RoleScopedQuerysetMixin, viewsets.ModelViewSet):
     serializer_class = StudentSerializer
     permission_classes = [IsAuthenticated]
+    manager_lookup = "batch__manager__user"
+    trainer_lookup = "lab__trainer__user"
 
     def get_permissions(self):
         role_permission_map = {
@@ -32,18 +35,8 @@ class StudentViewSet(viewsets.ModelViewSet):
 
         return [IsAuthenticated()]
 
-    def get_queryset(self):
-        user = self.request.user
-        base_queryset = Student.objects.select_related("batch", "lab").order_by("name")
-
-        if user.role == "ADMIN":
-            return base_queryset
-        if user.role == "MANAGER":
-            return base_queryset.filter(batch__manager__user=user)
-        if user.role == "TRAINER":
-            return base_queryset.filter(lab__trainer__user=user)
-
-        return base_queryset.none()
+    def get_base_queryset(self):
+        return Student.objects.select_related("batch", "lab").order_by("name")
 
     def perform_create(self, serializer):
         self._validate_write_scope(serializer)
