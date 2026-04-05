@@ -27,3 +27,7 @@ class IsTrainer(RolePermission):
 
 class IsManagerOrTrainer(RolePermission):
     allowed_roles = ("MANAGER", "TRAINER")
+
+
+class IsAdminOrManager(RolePermission):
+    allowed_roles = ("ADMIN", "MANAGER")
