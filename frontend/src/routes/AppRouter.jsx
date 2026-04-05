@@ -1,5 +1,6 @@
 import { Route, Routes } from "react-router-dom";
 
+import BatchesPage from "../pages/BatchesPage";
 import DashboardLayout from "../layouts/DashboardLayout";
 import DashboardPage from "../pages/DashboardPage";
 import ModulePage from "../pages/ModulePage";
@@ -10,15 +11,7 @@ function AppRouter() {
     <Routes>
       <Route element={<DashboardLayout />}>
         <Route index element={<DashboardPage />} />
-        <Route
-          path="batches"
-          element={
-            <ModulePage
-              title="Batches"
-              description="Create and manage training batches, schedules, and progress."
-            />
-          }
-        />
+        <Route path="batches" element={<BatchesPage />} />
         <Route
           path="students"
           element={
