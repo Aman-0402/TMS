@@ -11,11 +11,44 @@ const initialFormData = {
   lab: "",
 };
 
+function normalizeApiList(responseData) {
+  return Array.isArray(responseData) ? responseData : responseData.results || [];
+}
+
+function validateStudentForm(formData) {
+  const errors = {};
+
+  if (!formData.name.trim()) {
+    errors.name = "Student name is required.";
+  }
+
+  if (!formData.email.trim()) {
+    errors.email = "Email is required.";
+  } else if (!/^\S+@\S+\.\S+$/.test(formData.email)) {
+    errors.email = "Enter a valid email address.";
+  }
+
+  if (!formData.phone.trim()) {
+    errors.phone = "Phone number is required.";
+  }
+
+  if (!formData.batch) {
+    errors.batch = "Please select a batch.";
+  }
+
+  if (!formData.lab) {
+    errors.lab = "Please select a lab.";
+  }
+
+  return errors;
+}
+
 function StudentsPage() {
   const [students, setStudents] = useState([]);
   const [batches, setBatches] = useState([]);
   const [labs, setLabs] = useState([]);
   const [formData, setFormData] = useState(initialFormData);
+  const [formErrors, setFormErrors] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -42,9 +75,9 @@ function StudentsPage() {
         http.get("labs/"),
       ]);
 
-      setStudents(Array.isArray(studentsResponse.data) ? studentsResponse.data : studentsResponse.data.results || []);
-      setBatches(Array.isArray(batchesResponse.data) ? batchesResponse.data : batchesResponse.data.results || []);
-      setLabs(Array.isArray(labsResponse.data) ? labsResponse.data : labsResponse.data.results || []);
+      setStudents(normalizeApiList(studentsResponse.data));
+      setBatches(normalizeApiList(batchesResponse.data));
+      setLabs(normalizeApiList(labsResponse.data));
     } catch (fetchError) {
       setError("Unable to load student data. Please check the backend server.");
     } finally {
@@ -59,6 +92,12 @@ function StudentsPage() {
   const handleChange = (event) => {
     const { name, value } = event.target;
 
+    setFormErrors((currentErrors) => ({
+      ...currentErrors,
+      [name]: "",
+      ...(name === "batch" ? { lab: "" } : {}),
+    }));
+
     setFormData((currentData) => ({
       ...currentData,
       [name]: value,
@@ -70,6 +109,13 @@ function StudentsPage() {
     event.preventDefault();
     setSubmitError("");
     setSuccessMessage("");
+    const validationErrors = validateStudentForm(formData);
+
+    if (Object.keys(validationErrors).length > 0) {
+      setFormErrors(validationErrors);
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -80,13 +126,18 @@ function StudentsPage() {
       });
 
       setFormData(initialFormData);
+      setFormErrors({});
       setSuccessMessage("Student added successfully.");
       await loadData();
     } catch (submitRequestError) {
       const apiErrors = submitRequestError.response?.data;
 
       if (apiErrors && typeof apiErrors === "object") {
-        const firstError = Object.values(apiErrors).flat()[0];
+        const formattedErrors = Object.fromEntries(
+          Object.entries(apiErrors).map(([key, value]) => [key, Array.isArray(value) ? value[0] : value])
+        );
+        setFormErrors((currentErrors) => ({ ...currentErrors, ...formattedErrors }));
+        const firstError = Object.values(formattedErrors).flat()[0];
         setSubmitError(firstError || "Unable to add student.");
       } else {
         setSubmitError("Unable to add student. Please verify the form details.");
@@ -106,8 +157,13 @@ function StudentsPage() {
       <div className="row g-4">
         <div className="col-lg-4">
           <div className="card shadow-sm border-0">
+            <div className="card-header bg-white border-0 pb-0">
+              <h2 className="h5 mb-1">Add New Student</h2>
+              <p className="text-secondary small mb-0">
+                Fill in the required details and assign the student to a batch and lab.
+              </p>
+            </div>
             <div className="card-body">
-              <h2 className="h5 mb-3">Add New Student</h2>
 
               {submitError ? (
                 <div className="alert alert-danger" role="alert">
@@ -130,11 +186,13 @@ function StudentsPage() {
                     id="name"
                     name="name"
                     type="text"
-                    className="form-control"
+                    className={`form-control ${formErrors.name ? "is-invalid" : ""}`}
                     value={formData.name}
                     onChange={handleChange}
                     required
+                    placeholder="Enter full name"
                   />
+                  <div className="invalid-feedback">{formErrors.name}</div>
                 </div>
 
                 <div className="mb-3">
@@ -145,11 +203,13 @@ function StudentsPage() {
                     id="email"
                     name="email"
                     type="email"
-                    className="form-control"
+                    className={`form-control ${formErrors.email ? "is-invalid" : ""}`}
                     value={formData.email}
                     onChange={handleChange}
                     required
+                    placeholder="Enter email address"
                   />
+                  <div className="invalid-feedback">{formErrors.email}</div>
                 </div>
 
                 <div className="mb-3">
@@ -160,21 +220,24 @@ function StudentsPage() {
                     id="phone"
                     name="phone"
                     type="text"
-                    className="form-control"
+                    className={`form-control ${formErrors.phone ? "is-invalid" : ""}`}
                     value={formData.phone}
                     onChange={handleChange}
                     required
+                    placeholder="Enter phone number"
                   />
+                  <div className="invalid-feedback">{formErrors.phone}</div>
                 </div>
 
                 <div className="mb-3">
-                  <label className="form-label" htmlFor="batch">
+                  <label className="form-label d-flex justify-content-between align-items-center" htmlFor="batch">
                     Batch
+                    <span className="badge text-bg-light">{batches.length} available</span>
                   </label>
                   <select
                     id="batch"
                     name="batch"
-                    className="form-select"
+                    className={`form-select ${formErrors.batch ? "is-invalid" : ""}`}
                     value={formData.batch}
                     onChange={handleChange}
                     required
@@ -186,16 +249,18 @@ function StudentsPage() {
                       </option>
                     ))}
                   </select>
+                  <div className="invalid-feedback">{formErrors.batch}</div>
                 </div>
 
                 <div className="mb-4">
-                  <label className="form-label" htmlFor="lab">
+                  <label className="form-label d-flex justify-content-between align-items-center" htmlFor="lab">
                     Lab
+                    <span className="badge text-bg-light">{filteredLabs.length} available</span>
                   </label>
                   <select
                     id="lab"
                     name="lab"
-                    className="form-select"
+                    className={`form-select ${formErrors.lab ? "is-invalid" : ""}`}
                     value={formData.lab}
                     onChange={handleChange}
                     required
@@ -208,14 +273,27 @@ function StudentsPage() {
                       </option>
                     ))}
                   </select>
+                  <div className="form-text">
+                    {!formData.batch
+                      ? "Select a batch first to load matching labs."
+                      : "Only labs for the selected batch are shown."}
+                  </div>
+                  <div className="invalid-feedback d-block">{formErrors.lab}</div>
                 </div>
 
                 <button
                   type="submit"
-                  className="btn btn-primary w-100"
+                  className="btn btn-primary w-100 d-flex justify-content-center align-items-center gap-2"
                   disabled={isSubmitting}
                 >
-                  {isSubmitting ? "Saving..." : "Add Student"}
+                  {isSubmitting ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                      Saving...
+                    </>
+                  ) : (
+                    "Add Student"
+                  )}
                 </button>
               </form>
             </div>
