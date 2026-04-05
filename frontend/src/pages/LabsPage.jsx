@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import Swal from "sweetalert2";
 import { toast } from "react-toastify";
 
 import http from "../api/http";
@@ -17,6 +18,7 @@ function LabsPage() {
   const [labs, setLabs] = useState([]);
   const [batches, setBatches] = useState([]);
   const [formData, setFormData] = useState(initialFormData);
+  const [editingLabId, setEditingLabId] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -66,15 +68,24 @@ function LabsPage() {
     setIsSubmitting(true);
 
     try {
-      await http.post("labs/", {
+      const payload = {
         name: formData.name.trim(),
         batch: Number(formData.batch),
         trainer: null,
-      });
+      };
+
+      if (editingLabId) {
+        await http.put(`labs/${editingLabId}/`, payload);
+        setSuccessMessage("Lab updated successfully.");
+        toast.success("Lab updated successfully");
+      } else {
+        await http.post("labs/", payload);
+        setSuccessMessage("Lab created successfully.");
+        toast.success("Lab created successfully");
+      }
 
       setFormData(initialFormData);
-      setSuccessMessage("Lab created successfully.");
-      toast.success("Lab created successfully");
+      setEditingLabId(null);
       await loadData();
     } catch (requestError) {
       setSubmitError(
@@ -84,6 +95,63 @@ function LabsPage() {
           requestError.response?.data?.error ||
           "Unable to create lab."
       );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleEdit = (lab) => {
+    setSubmitError("");
+    setSuccessMessage("");
+    setEditingLabId(lab.id);
+    setFormData({
+      name: lab.name,
+      batch: String(lab.batch),
+    });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingLabId(null);
+    setFormData(initialFormData);
+    setSubmitError("");
+    setSuccessMessage("");
+  };
+
+  const handleDelete = async (lab) => {
+    const result = await Swal.fire({
+      title: "Are you sure?",
+      text: "This action cannot be undone.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#dc3545",
+      cancelButtonColor: "#6c757d",
+      confirmButtonText: "Yes, delete it",
+      cancelButtonText: "Cancel",
+    });
+
+    if (!result.isConfirmed) {
+      return;
+    }
+
+    setSubmitError("");
+    setSuccessMessage("");
+    setIsSubmitting(true);
+
+    try {
+      await http.delete(`labs/${lab.id}/`);
+
+      if (editingLabId === lab.id) {
+        handleCancelEdit();
+      }
+
+      await loadData();
+      toast.success("Lab deleted successfully");
+    } catch (requestError) {
+      const message =
+        requestError.response?.data?.error ||
+        requestError.response?.data?.detail ||
+        "Unable to delete lab.";
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -167,9 +235,20 @@ function LabsPage() {
                       Saving...
                     </>
                   ) : (
-                    "Create Lab"
+                    editingLabId ? "Update Lab" : "Create Lab"
                   )}
                 </button>
+
+                {editingLabId ? (
+                  <button
+                    type="button"
+                    className="btn btn-outline-secondary w-100 mt-2"
+                    onClick={handleCancelEdit}
+                    disabled={isSubmitting}
+                  >
+                    Cancel Edit
+                  </button>
+                ) : null}
               </form>
             </div>
           </div>
@@ -204,6 +283,7 @@ function LabsPage() {
                         <th scope="col">Lab Name</th>
                         <th scope="col">Batch</th>
                         <th scope="col">Trainer</th>
+                        <th scope="col" className="text-end">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -212,6 +292,26 @@ function LabsPage() {
                           <td>{lab.name}</td>
                           <td>{lab.batch_name}</td>
                           <td>{lab.trainer_name}</td>
+                          <td className="text-end">
+                            <div className="d-inline-flex gap-2">
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-outline-primary"
+                                onClick={() => handleEdit(lab)}
+                                disabled={isSubmitting}
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-outline-danger"
+                                onClick={() => handleDelete(lab)}
+                                disabled={isSubmitting}
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </td>
                         </tr>
                       ))}
                     </tbody>

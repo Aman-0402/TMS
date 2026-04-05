@@ -11,8 +11,10 @@ const pageTitles = {
   "/create-batch": "Create Batch",
   "/labs": "Labs",
   "/students": "Students",
+  "/students/list": "Student Directory",
   "/students/upload": "Student Upload",
   "/trainers": "Trainers",
+  "/managers": "Managers",
   "/attendance": "Attendance",
   "/results": "Results",
   "/approvals": "Approvals",
@@ -36,24 +38,30 @@ function DashboardLayout() {
       : []),
     ...(role === "ADMIN"
       ? [
+          { to: "/managers", label: "Managers" },
+          { to: "/trainers", label: "Trainers" },
           { to: "/students", label: "Students" },
+          { to: "/students/list", label: "Student Directory" },
           { to: "/students/upload", label: "Student Upload" },
         ]
       : []),
     ...(role === "MANAGER"
       ? [
+          { to: "/trainers", label: "Trainers" },
           { to: "/students", label: "Students" },
+          { to: "/students/list", label: "Student Directory" },
           { to: "/students/upload", label: "Student Upload" },
           { to: "/attendance", label: "Attendance" },
         ]
       : []),
     ...(role === "TRAINER"
       ? [
+          { to: "/students/list", label: "Student Directory" },
           { to: "/students/upload", label: "Student Upload" },
           { to: "/results", label: "Results" },
         ]
       : []),
-    ...(role === "ADMIN" ? [{ to: "/trainers", label: "Trainers" }, { to: "/approvals", label: "Approvals" }] : []),
+    ...(role === "ADMIN" ? [{ to: "/approvals", label: "Approvals" }] : []),
     ...(role === "MANAGER" ? [{ to: "/approvals", label: "Approvals" }] : []),
   ];
 

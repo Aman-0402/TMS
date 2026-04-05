@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
-from .models import AuditLog, User
+from .models import AuditLog, Manager, User
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
@@ -61,3 +61,104 @@ class AuditLogSerializer(serializers.ModelSerializer):
 
     def get_user(self, obj):
         return obj.user.username if obj.user else "System"
+
+
+class AvailableTrainerUserSerializer(serializers.ModelSerializer):
+    trainer_profile_id = serializers.SerializerMethodField()
+    current_batch = serializers.SerializerMethodField()
+    current_batch_name = serializers.SerializerMethodField()
+    assigned_lab_names = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = (
+            "id",
+            "username",
+            "email",
+            "role",
+            "trainer_profile_id",
+            "current_batch",
+            "current_batch_name",
+            "assigned_lab_names",
+        )
+        read_only_fields = fields
+
+    def _get_trainer_profile(self, obj):
+        try:
+            return obj.trainer_profile
+        except User.trainer_profile.RelatedObjectDoesNotExist:
+            return None
+
+    def get_trainer_profile_id(self, obj):
+        trainer = self._get_trainer_profile(obj)
+        return trainer.id if trainer else None
+
+    def get_current_batch(self, obj):
+        trainer = self._get_trainer_profile(obj)
+        return trainer.batch_id if trainer else None
+
+    def get_current_batch_name(self, obj):
+        trainer = self._get_trainer_profile(obj)
+        return trainer.batch.name if trainer else ""
+
+    def get_assigned_lab_names(self, obj):
+        trainer = self._get_trainer_profile(obj)
+        if not trainer:
+            return []
+
+        return list(trainer.labs.order_by("name").values_list("name", flat=True))
+
+
+class AvailableManagerUserSerializer(serializers.ModelSerializer):
+    manager_profile_id = serializers.SerializerMethodField()
+    current_batch = serializers.SerializerMethodField()
+    current_batch_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = (
+            "id",
+            "username",
+            "email",
+            "role",
+            "manager_profile_id",
+            "current_batch",
+            "current_batch_name",
+        )
+        read_only_fields = fields
+
+    def _get_manager_profile(self, obj):
+        try:
+            return obj.manager
+        except User.manager.RelatedObjectDoesNotExist:
+            return None
+
+    def get_manager_profile_id(self, obj):
+        manager = self._get_manager_profile(obj)
+        return manager.id if manager else None
+
+    def get_current_batch(self, obj):
+        manager = self._get_manager_profile(obj)
+        return manager.batch_id if manager else None
+
+    def get_current_batch_name(self, obj):
+        manager = self._get_manager_profile(obj)
+        return manager.batch.name if manager else ""
+
+
+class ManagerSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source="user.username", read_only=True)
+    email = serializers.EmailField(source="user.email", read_only=True)
+    batch_name = serializers.CharField(source="batch.name", read_only=True)
+
+    class Meta:
+        model = Manager
+        fields = ("id", "user", "username", "email", "batch", "batch_name")
+        read_only_fields = ("id", "username", "email", "batch_name")
+
+    def create(self, validated_data):
+        manager, _ = Manager.objects.update_or_create(
+            user=validated_data["user"],
+            defaults={"batch": validated_data["batch"]},
+        )
+        return manager

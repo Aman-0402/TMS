@@ -59,6 +59,19 @@ class BatchViewSet(SoftDeleteMixin, AuditLogMixin, RoleScopedQuerysetMixin, view
     def get_base_queryset(self):
         return Batch.objects.select_related("course", "created_by").order_by("-created_at")
 
+    def get_queryset(self):
+        self.debug_request_user("get_queryset")
+        queryset = self.get_base_queryset().filter(is_deleted=False)
+        role = getattr(self.request.user, "role", None)
+
+        if role in {"ADMIN", "MANAGER"}:
+            return queryset
+
+        if role == "TRAINER":
+            return queryset.filter(trainers__user=self.request.user).distinct()
+
+        return queryset.none()
+
     def perform_create(self, serializer):
         instance = serializer.save(created_by=self.request.user)
         self._log_audit_event(AuditLog.Action.CREATE, instance)

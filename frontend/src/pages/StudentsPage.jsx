@@ -4,7 +4,9 @@ import http from "../api/http";
 import PageHeader from "../components/common/PageHeader";
 
 const initialFormData = {
+  ug_number: "",
   name: "",
+  department: "",
   email: "",
   phone: "",
   batch: "",
@@ -18,18 +20,20 @@ function normalizeApiList(responseData) {
 function validateStudentForm(formData) {
   const errors = {};
 
+  if (!formData.ug_number.trim()) {
+    errors.ug_number = "UG Number is required.";
+  }
+
   if (!formData.name.trim()) {
     errors.name = "Student name is required.";
   }
 
-  if (!formData.email.trim()) {
-    errors.email = "Email is required.";
-  } else if (!/^\S+@\S+\.\S+$/.test(formData.email)) {
-    errors.email = "Enter a valid email address.";
+  if (!formData.department.trim()) {
+    errors.department = "Department is required.";
   }
 
-  if (!formData.phone.trim()) {
-    errors.phone = "Phone number is required.";
+  if (formData.email.trim() && !/^\S+@\S+\.\S+$/.test(formData.email)) {
+    errors.email = "Enter a valid email address.";
   }
 
   if (!formData.batch) {
@@ -129,6 +133,11 @@ function StudentsPage() {
     try {
       const payload = {
         ...formData,
+        ug_number: formData.ug_number.trim(),
+        name: formData.name.trim(),
+        department: formData.department.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone.trim(),
         batch: Number(formData.batch),
         lab: Number(formData.lab),
       };
@@ -168,7 +177,9 @@ function StudentsPage() {
     setFormErrors({});
     setEditingStudentId(student.id);
     setFormData({
+      ug_number: student.ug_number || "",
       name: student.name || "",
+      department: student.department || "",
       email: student.email || "",
       phone: student.phone || "",
       batch: student.batch ? String(student.batch) : "",
@@ -203,12 +214,26 @@ function StudentsPage() {
     }
   };
 
+  const handleOpenStudentList = () => {
+    window.open("/students/list", "_blank", "noopener,noreferrer");
+  };
+
   return (
     <>
       <PageHeader
         title="Students"
         description="Fetch students from the Django API and manage student records from one place."
       />
+
+      <div className="d-flex justify-content-end mb-4">
+        <button
+          type="button"
+          className="btn btn-outline-primary"
+          onClick={handleOpenStudentList}
+        >
+          Open Student List In New Tab
+        </button>
+      </div>
 
       <div className="row g-4">
         <div className="col-lg-4">
@@ -239,6 +264,23 @@ function StudentsPage() {
 
               <form onSubmit={handleSubmit}>
                 <div className="mb-3">
+                  <label className="form-label" htmlFor="ug_number">
+                    UG Number
+                  </label>
+                  <input
+                    id="ug_number"
+                    name="ug_number"
+                    type="text"
+                    className={`form-control ${formErrors.ug_number ? "is-invalid" : ""}`}
+                    value={formData.ug_number}
+                    onChange={handleChange}
+                    required
+                    placeholder="Enter UG number"
+                  />
+                  <div className="invalid-feedback">{formErrors.ug_number}</div>
+                </div>
+
+                <div className="mb-3">
                   <label className="form-label" htmlFor="name">
                     Name
                   </label>
@@ -256,8 +298,25 @@ function StudentsPage() {
                 </div>
 
                 <div className="mb-3">
+                  <label className="form-label" htmlFor="department">
+                    Department
+                  </label>
+                  <input
+                    id="department"
+                    name="department"
+                    type="text"
+                    className={`form-control ${formErrors.department ? "is-invalid" : ""}`}
+                    value={formData.department}
+                    onChange={handleChange}
+                    required
+                    placeholder="Enter department"
+                  />
+                  <div className="invalid-feedback">{formErrors.department}</div>
+                </div>
+
+                <div className="mb-3">
                   <label className="form-label" htmlFor="email">
-                    Email
+                    Email <span className="text-muted">(Optional)</span>
                   </label>
                   <input
                     id="email"
@@ -266,7 +325,6 @@ function StudentsPage() {
                     className={`form-control ${formErrors.email ? "is-invalid" : ""}`}
                     value={formData.email}
                     onChange={handleChange}
-                    required
                     placeholder="Enter email address"
                   />
                   <div className="invalid-feedback">{formErrors.email}</div>
@@ -274,7 +332,7 @@ function StudentsPage() {
 
                 <div className="mb-3">
                   <label className="form-label" htmlFor="phone">
-                    Phone
+                    Phone <span className="text-muted">(Optional)</span>
                   </label>
                   <input
                     id="phone"
@@ -283,7 +341,6 @@ function StudentsPage() {
                     className={`form-control ${formErrors.phone ? "is-invalid" : ""}`}
                     value={formData.phone}
                     onChange={handleChange}
-                    required
                     placeholder="Enter phone number"
                   />
                   <div className="invalid-feedback">{formErrors.phone}</div>
@@ -397,7 +454,9 @@ function StudentsPage() {
                   <table className="table table-hover align-middle mb-0">
                     <thead className="table-light">
                       <tr>
+                        <th scope="col">UG Number</th>
                         <th scope="col">Name</th>
+                        <th scope="col">Department</th>
                         <th scope="col">Email</th>
                         <th scope="col">Phone</th>
                         <th scope="col">Batch</th>
@@ -408,7 +467,9 @@ function StudentsPage() {
                     <tbody>
                       {students.map((student) => (
                         <tr key={student.id}>
+                          <td>{student.ug_number}</td>
                           <td>{student.name}</td>
+                          <td>{student.department}</td>
                           <td>{student.email}</td>
                           <td>{student.phone}</td>
                           <td>{student.batch_name || student.batch}</td>

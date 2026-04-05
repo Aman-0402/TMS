@@ -4,11 +4,14 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 
-from .models import AuditLog, User
-from .permissions import IsAdmin
+from .models import AuditLog, Manager, User
+from .permissions import IsAdmin, IsAdminOrManager
 from .serializers import (
     AuditLogSerializer,
+    AvailableManagerUserSerializer,
+    AvailableTrainerUserSerializer,
     CustomTokenObtainPairSerializer,
+    ManagerSerializer,
     PendingUserSerializer,
     RegisterSerializer,
 )
@@ -91,3 +94,39 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         return AuditLog.objects.select_related("user").order_by("-created_at")
+
+
+class AvailableTrainerUserListView(generics.ListAPIView):
+    serializer_class = AvailableTrainerUserSerializer
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrManager]
+
+    def get_queryset(self):
+        return User.objects.filter(
+            role="TRAINER",
+            is_approved=True,
+        ).select_related("trainer_profile", "trainer_profile__batch").prefetch_related("trainer_profile__labs").order_by("username")
+
+
+class AvailableManagerUserListView(generics.ListAPIView):
+    serializer_class = AvailableManagerUserSerializer
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get_queryset(self):
+        return User.objects.filter(
+            role="MANAGER",
+            is_approved=True,
+        ).select_related("manager", "manager__batch").order_by("username")
+
+
+class ManagerViewSet(viewsets.ModelViewSet):
+    serializer_class = ManagerSerializer
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get_queryset(self):
+        return Manager.objects.select_related("user", "batch").order_by("user__username")
+
+    def perform_create(self, serializer):
+        serializer.save()
+
+    def perform_update(self, serializer):
+        serializer.save()

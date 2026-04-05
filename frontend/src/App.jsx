@@ -7,12 +7,15 @@ import CoursesPage from "./pages/CoursesPage";
 import DashboardPage from "./pages/DashboardPage";
 import LabsPage from "./pages/LabsPage";
 import Login from "./pages/Login";
+import ManagersPage from "./pages/ManagersPage";
 import ModulePage from "./pages/ModulePage";
 import NotFoundPage from "./pages/NotFoundPage";
 import ApprovalPage from "./pages/ApprovalPage";
 import RegisterPage from "./pages/RegisterPage";
 import StudentsPage from "./pages/StudentsPage";
+import StudentsListPage from "./pages/StudentsListPage";
 import StudentUploadPage from "./pages/StudentUploadPage";
+import TrainersPage from "./pages/TrainersPage";
 import PrivateRoute from "./routes/PrivateRoute";
 
 function App() {
@@ -71,6 +74,14 @@ function App() {
           }
         />
         <Route
+          path="students/list"
+          element={
+            <PrivateRoute allowedRoles={["ADMIN", "MANAGER", "TRAINER"]}>
+              <StudentsListPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
           path="students/upload"
           element={
             <PrivateRoute allowedRoles={["ADMIN", "MANAGER", "TRAINER"]}>
@@ -89,11 +100,16 @@ function App() {
         <Route
           path="trainers"
           element={
+            <PrivateRoute allowedRoles={["ADMIN", "MANAGER"]}>
+              <TrainersPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="managers"
+          element={
             <PrivateRoute allowedRoles={["ADMIN"]}>
-              <ModulePage
-                title="Trainers"
-                description="Assign trainers to batches and manage trainer-related workflows."
-              />
+              <ManagersPage />
             </PrivateRoute>
           }
         />
