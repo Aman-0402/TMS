@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
+import Swal from "sweetalert2";
+import { toast } from "react-toastify";
 
 import http from "../api/http";
 import PageHeader from "../components/common/PageHeader";
+import { getRole } from "../utils/auth";
 
 const initialFormData = {
   name: "",
@@ -27,6 +30,8 @@ function formatDate(value) {
 }
 
 function BatchesPage() {
+  const role = getRole();
+  const canDelete = role === "ADMIN" || role === "MANAGER";
   const [batches, setBatches] = useState([]);
   const [courses, setCourses] = useState([]);
   const [formData, setFormData] = useState(initialFormData);
@@ -97,6 +102,41 @@ function BatchesPage() {
           requestError.response?.data?.name?.[0] ||
           "Unable to create batch."
       );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (batch) => {
+    const result = await Swal.fire({
+      title: "Are you sure?",
+      text: "This action cannot be undone.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#dc3545",
+      cancelButtonColor: "#6c757d",
+      confirmButtonText: "Yes, delete it",
+      cancelButtonText: "Cancel",
+    });
+
+    if (!result.isConfirmed) {
+      return;
+    }
+
+    setSubmitError("");
+    setSuccessMessage("");
+    setIsSubmitting(true);
+
+    try {
+      await http.delete(`batches/${batch.id}/`);
+      await loadData();
+      toast.success("Deleted successfully");
+    } catch (requestError) {
+      const message =
+        requestError.response?.data?.error ||
+        requestError.response?.data?.detail ||
+        "Delete failed";
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -251,6 +291,9 @@ function BatchesPage() {
                         <th scope="col">Start Date</th>
                         <th scope="col">End Date</th>
                         <th scope="col">Status</th>
+                        {canDelete ? (
+                          <th scope="col" className="text-end">Actions</th>
+                        ) : null}
                       </tr>
                     </thead>
                     <tbody>
@@ -266,6 +309,18 @@ function BatchesPage() {
                           <td>
                             <span className="badge text-bg-primary">{batch.status}</span>
                           </td>
+                          {canDelete ? (
+                            <td className="text-end">
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-outline-danger"
+                                onClick={() => handleDelete(batch)}
+                                disabled={isSubmitting}
+                              >
+                                Delete
+                              </button>
+                            </td>
+                          ) : null}
                         </tr>
                       ))}
                     </tbody>

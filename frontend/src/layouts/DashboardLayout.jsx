@@ -25,11 +25,15 @@ function DashboardLayout() {
   const navigationItems = [
     { to: "/", label: "Dashboard", end: true },
     ...(role === "ADMIN" ? [{ to: "/audit-logs", label: "Audit Logs" }] : []),
-    ...(role === "ADMIN"
+    ...((role === "ADMIN" || role === "MANAGER")
       ? [
           { to: "/courses", label: "Courses" },
           { to: "/create-batch", label: "Create Batch" },
           { to: "/batches", label: "Batches" },
+        ]
+      : []),
+    ...(role === "ADMIN"
+      ? [
           { to: "/students", label: "Students" },
           { to: "/students/upload", label: "Student Upload" },
         ]

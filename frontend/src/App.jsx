@@ -40,7 +40,7 @@ function App() {
         <Route
           path="courses"
           element={
-            <PrivateRoute allowedRoles={["ADMIN"]}>
+            <PrivateRoute allowedRoles={["ADMIN", "MANAGER"]}>
               <CoursesPage />
             </PrivateRoute>
           }
@@ -48,7 +48,7 @@ function App() {
         <Route
           path="batches"
           element={
-            <PrivateRoute allowedRoles={["ADMIN"]}>
+            <PrivateRoute allowedRoles={["ADMIN", "MANAGER"]}>
               <BatchesPage />
             </PrivateRoute>
           }
@@ -56,7 +56,7 @@ function App() {
         <Route
           path="create-batch"
           element={
-            <PrivateRoute allowedRoles={["ADMIN"]}>
+            <PrivateRoute allowedRoles={["ADMIN", "MANAGER"]}>
               <BatchesPage />
             </PrivateRoute>
           }

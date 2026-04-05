@@ -5,6 +5,8 @@ from django.db.models import F, Q
 class Course(models.Model):
     name = models.CharField(max_length=100)
     certification = models.CharField(max_length=100)
+    is_deleted = models.BooleanField(default=False, db_index=True)
+    deleted_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ["name", "certification"]
@@ -39,6 +41,8 @@ class Batch(models.Model):
         default=Status.ACTIVE,
         db_index=True,
     )
+    is_deleted = models.BooleanField(default=False, db_index=True)
+    deleted_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

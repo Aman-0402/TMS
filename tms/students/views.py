@@ -8,7 +8,7 @@ from rest_framework.permissions import BasePermission, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 
-from accounts.mixins import AuditLogMixin, RoleScopedQuerysetMixin
+from accounts.mixins import AuditLogMixin, RoleScopedQuerysetMixin, SoftDeleteMixin
 from accounts.models import AuditLog, Manager
 from accounts.permissions import IsAdmin, IsManager, IsTrainer
 
@@ -24,7 +24,7 @@ class DenyAllPermission(BasePermission):
         return False
 
 
-class StudentViewSet(AuditLogMixin, RoleScopedQuerysetMixin, viewsets.ModelViewSet):
+class StudentViewSet(SoftDeleteMixin, AuditLogMixin, RoleScopedQuerysetMixin, viewsets.ModelViewSet):
     serializer_class = StudentSerializer
     permission_classes = [IsAuthenticated]
     parser_classes = [JSONParser, MultiPartParser, FormParser]
@@ -32,6 +32,7 @@ class StudentViewSet(AuditLogMixin, RoleScopedQuerysetMixin, viewsets.ModelViewS
     trainer_lookup = "lab__trainer__user"
 
     def get_permissions(self):
+        self.debug_request_user("get_permissions")
         role_permission_map = {
             "ADMIN": IsAdmin,
             "MANAGER": IsManager,
@@ -47,6 +48,7 @@ class StudentViewSet(AuditLogMixin, RoleScopedQuerysetMixin, viewsets.ModelViewS
             "update",
             "partial_update",
             "destroy",
+            "restore",
             "upload_excel",
         }:
             return [IsAuthenticated(), permission_class()]
@@ -124,7 +126,7 @@ class StudentViewSet(AuditLogMixin, RoleScopedQuerysetMixin, viewsets.ModelViewS
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        batch = Batch.objects.filter(pk=batch_id).first()
+        batch = Batch.objects.filter(pk=batch_id, is_deleted=False).first()
         if not batch:
             return Response({"error": "Batch not found"}, status=status.HTTP_404_NOT_FOUND)
 
