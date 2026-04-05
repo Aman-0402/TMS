@@ -80,6 +80,21 @@
   width: 100%;
 }
 
+.audit-log-summary {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.audit-log-table tbody tr {
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.audit-log-table tbody tr:hover {
+  background-color: #f8fbff;
+}
+
 @media (max-width: 991.98px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -92,5 +107,9 @@
   .content-header,
   .content-body {
     padding: 1.25rem;
+  }
+
+  .audit-log-summary {
+    justify-content: flex-start;
   }
 }

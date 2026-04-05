@@ -1,13 +1,13 @@
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 
-from accounts.mixins import RoleScopedQuerysetMixin
+from accounts.mixins import AuditLogMixin, RoleScopedQuerysetMixin
 
 from .models import Batch
 from .serializers import BatchSerializer
 
 
-class BatchViewSet(RoleScopedQuerysetMixin, viewsets.ModelViewSet):
+class BatchViewSet(AuditLogMixin, RoleScopedQuerysetMixin, viewsets.ModelViewSet):
     serializer_class = BatchSerializer
     permission_classes = [IsAuthenticated]
     manager_lookup = "manager__user"

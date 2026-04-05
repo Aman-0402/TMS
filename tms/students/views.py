@@ -2,7 +2,7 @@ from rest_framework import viewsets
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import BasePermission, IsAuthenticated
 
-from accounts.mixins import RoleScopedQuerysetMixin
+from accounts.mixins import AuditLogMixin, RoleScopedQuerysetMixin
 from accounts.models import Manager
 from accounts.permissions import IsAdmin, IsManager, IsTrainer
 
@@ -15,7 +15,7 @@ class DenyAllPermission(BasePermission):
         return False
 
 
-class StudentViewSet(RoleScopedQuerysetMixin, viewsets.ModelViewSet):
+class StudentViewSet(AuditLogMixin, RoleScopedQuerysetMixin, viewsets.ModelViewSet):
     serializer_class = StudentSerializer
     permission_classes = [IsAuthenticated]
     manager_lookup = "batch__manager__user"
@@ -40,16 +40,16 @@ class StudentViewSet(RoleScopedQuerysetMixin, viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         self._validate_write_scope(serializer)
-        serializer.save()
+        super().perform_create(serializer)
 
     def perform_update(self, serializer):
         self._assert_user_can_modify_student(serializer.instance)
         self._validate_write_scope(serializer)
-        serializer.save()
+        super().perform_update(serializer)
 
     def perform_destroy(self, instance):
         self._assert_user_can_modify_student(instance)
-        instance.delete()
+        super().perform_destroy(instance)
 
     def _assert_user_can_modify_student(self, student):
         user = self.request.user

@@ -5,6 +5,7 @@ import { getRole } from "../utils/auth";
 
 const pageTitles = {
   "/": "Dashboard",
+  "/audit-logs": "Audit Logs",
   "/batches": "Batches",
   "/students": "Students",
   "/trainers": "Trainers",
@@ -20,6 +21,7 @@ function DashboardLayout() {
   const pageTitle = pageTitles[location.pathname] || "TMS";
   const navigationItems = [
     { to: "/", label: "Dashboard", end: true },
+    ...(role === "ADMIN" ? [{ to: "/audit-logs", label: "Audit Logs" }] : []),
     ...(role === "ADMIN" ? [{ to: "/batches", label: "Batches" }, { to: "/students", label: "Students" }] : []),
     ...(role === "MANAGER" ? [{ to: "/students", label: "Students" }, { to: "/attendance", label: "Attendance" }] : []),
     ...(role === "TRAINER" ? [{ to: "/results", label: "Results" }] : []),

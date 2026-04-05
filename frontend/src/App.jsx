@@ -1,6 +1,7 @@
 import { Route, Routes } from "react-router-dom";
 
 import DashboardLayout from "./layouts/DashboardLayout";
+import AuditLogsPage from "./pages/AuditLogsPage";
 import BatchesPage from "./pages/BatchesPage";
 import DashboardPage from "./pages/DashboardPage";
 import Login from "./pages/Login";
@@ -26,6 +27,14 @@ function App() {
         }
       >
         <Route index element={<DashboardPage />} />
+        <Route
+          path="audit-logs"
+          element={
+            <PrivateRoute allowedRoles={["ADMIN"]}>
+              <AuditLogsPage />
+            </PrivateRoute>
+          }
+        />
         <Route
           path="batches"
           element={
