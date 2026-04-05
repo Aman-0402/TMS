@@ -1,11 +1,13 @@
-from rest_framework import generics, permissions, status
+from rest_framework import generics, permissions, status, viewsets
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 
-from .models import User
+from .models import AuditLog, User
+from .permissions import IsAdmin
 from .serializers import (
+    AuditLogSerializer,
     CustomTokenObtainPairSerializer,
     PendingUserSerializer,
     RegisterSerializer,
@@ -81,3 +83,11 @@ class ApproveUserView(APIView):
             {"message": f"{target_user.username} approved successfully"},
             status=status.HTTP_200_OK,
         )
+
+
+class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = AuditLogSerializer
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get_queryset(self):
+        return AuditLog.objects.select_related("user").order_by("-created_at")

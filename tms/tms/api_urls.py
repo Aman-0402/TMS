@@ -1,10 +1,12 @@
 from rest_framework.routers import DefaultRouter
 
+from accounts.views import AuditLogViewSet
 from batch.views import BatchViewSet, CourseViewSet
 from labs.views import LabViewSet
 from results.views import ResultViewSet
 
 router = DefaultRouter()
+router.register("audit-logs", AuditLogViewSet, basename="audit-log")
 router.register("courses", CourseViewSet, basename="course")
 router.register("batches", BatchViewSet, basename="batch")
 router.register("labs", LabViewSet, basename="lab")

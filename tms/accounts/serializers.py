@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
-from .models import User
+from .models import AuditLog, User
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
@@ -47,3 +47,17 @@ class PendingUserSerializer(serializers.ModelSerializer):
         model = User
         fields = ("id", "username", "email", "role", "is_approved")
         read_only_fields = fields
+
+
+class AuditLogSerializer(serializers.ModelSerializer):
+    user = serializers.SerializerMethodField()
+    model = serializers.CharField(source="model_name", read_only=True)
+    timestamp = serializers.DateTimeField(source="created_at", read_only=True)
+
+    class Meta:
+        model = AuditLog
+        fields = ("id", "user", "action", "model", "object_id", "timestamp")
+        read_only_fields = fields
+
+    def get_user(self, obj):
+        return obj.user.username if obj.user else "System"
