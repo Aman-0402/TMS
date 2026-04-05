@@ -12,6 +12,8 @@ class Lab(models.Model):
         "trainers.Trainer",
         on_delete=models.CASCADE,
         related_name="labs",
+        null=True,
+        blank=True,
     )
 
     class Meta:

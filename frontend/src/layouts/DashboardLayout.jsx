@@ -9,6 +9,7 @@ const pageTitles = {
   "/courses": "Courses",
   "/batches": "Batches",
   "/create-batch": "Create Batch",
+  "/labs": "Labs",
   "/students": "Students",
   "/students/upload": "Student Upload",
   "/trainers": "Trainers",
@@ -30,6 +31,7 @@ function DashboardLayout() {
           { to: "/courses", label: "Courses" },
           { to: "/create-batch", label: "Create Batch" },
           { to: "/batches", label: "Batches" },
+          { to: "/labs", label: "Labs" },
         ]
       : []),
     ...(role === "ADMIN"

@@ -5,6 +5,7 @@ import AuditLogsPage from "./pages/AuditLogsPage";
 import BatchesPage from "./pages/BatchesPage";
 import CoursesPage from "./pages/CoursesPage";
 import DashboardPage from "./pages/DashboardPage";
+import LabsPage from "./pages/LabsPage";
 import Login from "./pages/Login";
 import ModulePage from "./pages/ModulePage";
 import NotFoundPage from "./pages/NotFoundPage";
@@ -99,10 +100,9 @@ function App() {
         <Route
           path="labs"
           element={
-            <ModulePage
-              title="Labs"
-              description="Handle lab allocation and trainer-based lab ownership."
-            />
+            <PrivateRoute allowedRoles={["ADMIN", "MANAGER"]}>
+              <LabsPage />
+            </PrivateRoute>
           }
         />
         <Route

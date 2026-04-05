@@ -2,6 +2,7 @@ from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 
 from accounts.mixins import AuditLogMixin, RoleScopedQuerysetMixin
+from accounts.permissions import IsAdminOrManager
 
 from .models import Lab
 from .serializers import LabSerializer
@@ -12,6 +13,12 @@ class LabViewSet(AuditLogMixin, RoleScopedQuerysetMixin, viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     manager_lookup = "batch__manager__user"
     trainer_lookup = "trainer__user"
+
+    def get_permissions(self):
+        if self.action in {"create", "update", "partial_update", "destroy"}:
+            return [IsAuthenticated(), IsAdminOrManager()]
+
+        return [IsAuthenticated()]
 
     def get_base_queryset(self):
         return Lab.objects.select_related("batch", "trainer", "trainer__user").order_by("name")

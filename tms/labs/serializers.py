@@ -5,11 +5,15 @@ from .models import Lab
 
 class LabSerializer(serializers.ModelSerializer):
     batch_name = serializers.CharField(source="batch.name", read_only=True)
+    trainer_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Lab
-        fields = ("id", "name", "batch", "batch_name", "trainer")
+        fields = ("id", "name", "batch", "batch_name", "trainer", "trainer_name")
         read_only_fields = ("id",)
+        extra_kwargs = {
+            "trainer": {"required": False, "allow_null": True},
+        }
 
     def validate(self, attrs):
         batch = attrs.get("batch", getattr(self.instance, "batch", None))
@@ -21,3 +25,9 @@ class LabSerializer(serializers.ModelSerializer):
             )
 
         return attrs
+
+    def get_trainer_name(self, obj):
+        if not obj.trainer_id:
+            return "Unassigned"
+
+        return obj.trainer.user.username

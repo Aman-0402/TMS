@@ -291,7 +291,7 @@ class StudentViewSet(SoftDeleteMixin, AuditLogMixin, RoleScopedQuerysetMixin, vi
 
     def _get_or_create_upload_lab(self, batch, lab_name, labs_by_name):
         trainer = self._resolve_upload_lab_trainer(batch)
-        if not trainer:
+        if self.request.user.role == "TRAINER" and not trainer:
             return None
 
         lab, _ = Lab.objects.get_or_create(
