@@ -49,6 +49,7 @@ function StudentsPage() {
   const [labs, setLabs] = useState([]);
   const [formData, setFormData] = useState(initialFormData);
   const [formErrors, setFormErrors] = useState({});
+  const [editingStudentId, setEditingStudentId] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -89,6 +90,13 @@ function StudentsPage() {
     loadData();
   }, []);
 
+  const resetForm = () => {
+    setFormData(initialFormData);
+    setFormErrors({});
+    setEditingStudentId(null);
+    setSubmitError("");
+  };
+
   const handleChange = (event) => {
     const { name, value } = event.target;
 
@@ -119,15 +127,22 @@ function StudentsPage() {
     setIsSubmitting(true);
 
     try {
-      await http.post("students/", {
+      const payload = {
         ...formData,
         batch: Number(formData.batch),
         lab: Number(formData.lab),
-      });
+      };
 
-      setFormData(initialFormData);
-      setFormErrors({});
-      setSuccessMessage("Student added successfully.");
+      if (editingStudentId) {
+        await http.put(`students/${editingStudentId}/`, payload);
+      } else {
+        await http.post("students/", payload);
+      }
+
+      resetForm();
+      setSuccessMessage(
+        editingStudentId ? "Student updated successfully." : "Student added successfully."
+      );
       await loadData();
     } catch (submitRequestError) {
       const apiErrors = submitRequestError.response?.data;
@@ -147,20 +162,65 @@ function StudentsPage() {
     }
   };
 
+  const handleEdit = (student) => {
+    setSuccessMessage("");
+    setSubmitError("");
+    setFormErrors({});
+    setEditingStudentId(student.id);
+    setFormData({
+      name: student.name || "",
+      email: student.email || "",
+      phone: student.phone || "",
+      batch: student.batch ? String(student.batch) : "",
+      lab: student.lab ? String(student.lab) : "",
+    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleDelete = async (student) => {
+    const confirmed = window.confirm(
+      `Delete ${student.name}? This action cannot be undone.`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setSubmitError("");
+    setSuccessMessage("");
+
+    try {
+      await http.delete(`students/${student.id}/`);
+
+      if (editingStudentId === student.id) {
+        resetForm();
+      }
+
+      setSuccessMessage("Student deleted successfully.");
+      await loadData();
+    } catch (deleteError) {
+      setSubmitError("Unable to delete student. Please try again.");
+    }
+  };
+
   return (
     <>
       <PageHeader
         title="Students"
-        description="Fetch students from the Django API and add new students from one place."
+        description="Fetch students from the Django API and manage student records from one place."
       />
 
       <div className="row g-4">
         <div className="col-lg-4">
           <div className="card shadow-sm border-0">
             <div className="card-header bg-white border-0 pb-0">
-              <h2 className="h5 mb-1">Add New Student</h2>
+              <h2 className="h5 mb-1">
+                {editingStudentId ? "Edit Student" : "Add New Student"}
+              </h2>
               <p className="text-secondary small mb-0">
-                Fill in the required details and assign the student to a batch and lab.
+                {editingStudentId
+                  ? "Update the student details and save your changes."
+                  : "Fill in the required details and assign the student to a batch and lab."}
               </p>
             </div>
             <div className="card-body">
@@ -292,9 +352,20 @@ function StudentsPage() {
                       Saving...
                     </>
                   ) : (
-                    "Add Student"
+                    editingStudentId ? "Update Student" : "Add Student"
                   )}
                 </button>
+
+                {editingStudentId ? (
+                  <button
+                    type="button"
+                    className="btn btn-outline-secondary w-100 mt-2"
+                    onClick={resetForm}
+                    disabled={isSubmitting}
+                  >
+                    Cancel Edit
+                  </button>
+                ) : null}
               </form>
             </div>
           </div>
@@ -331,6 +402,7 @@ function StudentsPage() {
                         <th scope="col">Phone</th>
                         <th scope="col">Batch</th>
                         <th scope="col">Lab</th>
+                        <th scope="col" className="text-end">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -341,6 +413,26 @@ function StudentsPage() {
                           <td>{student.phone}</td>
                           <td>{student.batch_name || student.batch}</td>
                           <td>{student.lab_name || student.lab}</td>
+                          <td className="text-end">
+                            <div className="d-inline-flex gap-2">
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-outline-primary"
+                                onClick={() => handleEdit(student)}
+                                disabled={isSubmitting}
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-outline-danger"
+                                onClick={() => handleDelete(student)}
+                                disabled={isSubmitting}
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
