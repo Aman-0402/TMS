@@ -17,6 +17,7 @@ class CustomUserAdmin(UserAdmin):
     )
     list_filter = ("role", "is_approved", "is_staff", "is_superuser", "is_active")
     list_editable = ("is_approved",)
+    actions = ("approve_users",)
 
     fieldsets = UserAdmin.fieldsets + (
         ("TMS Access", {"fields": ("role", "is_approved")}),
@@ -26,3 +27,7 @@ class CustomUserAdmin(UserAdmin):
     )
     search_fields = ("username", "email", "first_name", "last_name")
     ordering = ("username",)
+
+    @admin.action(description="Approve selected users")
+    def approve_users(self, request, queryset):
+        queryset.update(is_approved=True)
