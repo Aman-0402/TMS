@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
-from .models import Manager, User
+from .models import AuditLog, Manager, User
 
 
 @admin.register(User)
@@ -38,3 +38,12 @@ class ManagerAdmin(admin.ModelAdmin):
     list_display = ("user", "batch")
     list_select_related = ("user", "batch")
     search_fields = ("user__username", "user__email", "batch__name")
+
+
+@admin.register(AuditLog)
+class AuditLogAdmin(admin.ModelAdmin):
+    list_display = ("user", "action", "model_name", "object_id", "created_at")
+    list_filter = ("action", "model_name", "created_at")
+    list_select_related = ("user",)
+    search_fields = ("user__username", "model_name", "description")
+    readonly_fields = ("created_at",)

@@ -47,3 +47,30 @@ class Manager(models.Model):
 
     def __str__(self):
         return self.user.username
+
+
+class AuditLog(models.Model):
+    class Action(models.TextChoices):
+        CREATE = "CREATE", "Create"
+        UPDATE = "UPDATE", "Update"
+        DELETE = "DELETE", "Delete"
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="audit_logs",
+    )
+    action = models.CharField(max_length=10, choices=Action.choices, db_index=True)
+    model_name = models.CharField(max_length=100, db_index=True)
+    object_id = models.PositiveBigIntegerField(db_index=True)
+    description = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        actor = self.user.username if self.user else "System"
+        return f"{actor} - {self.action} - {self.model_name}#{self.object_id}"
