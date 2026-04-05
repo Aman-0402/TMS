@@ -10,6 +10,7 @@ import NotFoundPage from "./pages/NotFoundPage";
 import ApprovalPage from "./pages/ApprovalPage";
 import RegisterPage from "./pages/RegisterPage";
 import StudentsPage from "./pages/StudentsPage";
+import StudentUploadPage from "./pages/StudentUploadPage";
 import PrivateRoute from "./routes/PrivateRoute";
 
 function App() {
@@ -48,6 +49,14 @@ function App() {
           element={
             <PrivateRoute allowedRoles={["ADMIN", "MANAGER"]}>
               <StudentsPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="students/upload"
+          element={
+            <PrivateRoute allowedRoles={["ADMIN", "MANAGER", "TRAINER"]}>
+              <StudentUploadPage />
             </PrivateRoute>
           }
         />

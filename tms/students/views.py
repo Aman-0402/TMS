@@ -14,6 +14,7 @@ from accounts.permissions import IsAdmin, IsManager, IsTrainer
 
 from batch.models import Batch
 from labs.models import Lab
+from trainers.models import Trainer
 from .models import Student
 from .serializers import StudentSerializer
 
@@ -117,6 +118,12 @@ class StudentViewSet(AuditLogMixin, RoleScopedQuerysetMixin, viewsets.ModelViewS
         if not batch_id:
             return Response({"error": "Batch is required"}, status=status.HTTP_400_BAD_REQUEST)
 
+        if not uploaded_file.name.lower().endswith((".xlsx", ".xls")):
+            return Response(
+                {"error": "Wrong file format. Please upload an Excel file (.xlsx or .xls)."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         batch = Batch.objects.filter(pk=batch_id).first()
         if not batch:
             return Response({"error": "Batch not found"}, status=status.HTTP_404_NOT_FOUND)
@@ -127,9 +134,17 @@ class StudentViewSet(AuditLogMixin, RoleScopedQuerysetMixin, viewsets.ModelViewS
             dataframe = pd.read_excel(uploaded_file)
         except Exception:
             return Response(
-                {"error": "Unable to read the uploaded Excel file."},
+                {"error": "Unable to read the uploaded Excel file. Please check the format and try again."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        if dataframe.empty:
+            return Response(
+                {"error": "The uploaded Excel file is empty."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        dataframe.rename(columns=lambda column_name: str(column_name).strip(), inplace=True)
 
         required_columns = {"UG Number", "Name", "Department", "Lab"}
         missing_columns = required_columns.difference(dataframe.columns)
@@ -142,11 +157,36 @@ class StudentViewSet(AuditLogMixin, RoleScopedQuerysetMixin, viewsets.ModelViewS
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        normalized_ug_numbers = [
+            self._get_excel_value(row_data, "UG Number")
+            for _, row_data in dataframe.iterrows()
+            if self._get_excel_value(row_data, "UG Number")
+        ]
+        duplicate_ug_numbers_in_file = sorted(
+            {
+                ug_number
+                for ug_number in normalized_ug_numbers
+                if normalized_ug_numbers.count(ug_number) > 1
+            }
+        )
+        if duplicate_ug_numbers_in_file:
+            return Response(
+                {
+                    "error": "Duplicate UG numbers found in the uploaded file.",
+                    "duplicate_ug_numbers": duplicate_ug_numbers_in_file,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         labs_by_name = {
             str(lab.name).strip(): lab
             for lab in Lab.objects.select_related("trainer", "trainer__user").filter(batch=batch)
         }
-        created_count = 0
+        existing_ug_numbers = set(
+            Student.objects.filter(ug_number__in=normalized_ug_numbers).values_list("ug_number", flat=True)
+        )
+        students_to_create = []
+        created_ug_numbers = []
         skipped_duplicates = 0
 
         with transaction.atomic():
@@ -167,40 +207,57 @@ class StudentViewSet(AuditLogMixin, RoleScopedQuerysetMixin, viewsets.ModelViewS
 
                 lab = labs_by_name.get(lab_name)
                 if not lab:
+                    lab = self._get_or_create_upload_lab(batch, lab_name, labs_by_name)
+
+                if not lab:
                     return Response(
-                        {"error": f"Lab '{lab_name}' not found in batch '{batch.name}'."},
+                        {"error": f"Unable to assign or create lab '{lab_name}' for batch '{batch.name}'."},
                         status=status.HTTP_400_BAD_REQUEST,
                     )
 
                 self._validate_lab_upload_scope(lab)
 
-                student, created = Student.objects.get_or_create(
-                    batch=batch,
-                    ug_number=ug_number,
-                    defaults={
-                        "name": name,
-                        "department": department,
-                        "email": email,
-                        "phone": phone,
-                        "lab": lab,
-                    },
-                )
-
-                if not created:
+                if ug_number in existing_ug_numbers:
                     skipped_duplicates += 1
                     continue
 
-                created_count += 1
-                self._log_audit_event(
-                    AuditLog.Action.CREATE,
-                    student,
-                    description=f"Created Student via Excel upload: {student}",
+                students_to_create.append(
+                    Student(
+                        ug_number=ug_number,
+                        name=name,
+                        department=department,
+                        email=email,
+                        phone=phone,
+                        batch=batch,
+                        lab=lab,
+                    )
                 )
+                created_ug_numbers.append(ug_number)
+                existing_ug_numbers.add(ug_number)
+
+            Student.objects.bulk_create(students_to_create, batch_size=1000)
+
+            created_students = list(
+                Student.objects.filter(ug_number__in=created_ug_numbers).select_related("batch")
+            )
+            AuditLog.objects.bulk_create(
+                [
+                    AuditLog(
+                        user=request.user,
+                        action=AuditLog.Action.CREATE,
+                        model_name="Student",
+                        object_id=student.pk,
+                        description=f"Created Student via Excel upload: {student}",
+                    )
+                    for student in created_students
+                ],
+                batch_size=1000,
+            )
 
         return Response(
             {
-                "message": f"{created_count} students uploaded successfully",
-                "created_count": created_count,
+                "message": f"{len(students_to_create)} students uploaded successfully",
+                "created_count": len(students_to_create),
                 "skipped_duplicates": skipped_duplicates,
             },
             status=status.HTTP_201_CREATED,
@@ -229,6 +286,30 @@ class StudentViewSet(AuditLogMixin, RoleScopedQuerysetMixin, viewsets.ModelViewS
 
         if user.role == "TRAINER" and lab.trainer.user_id != user.id:
             raise PermissionDenied("Trainers can only assign students to their own labs.")
+
+    def _get_or_create_upload_lab(self, batch, lab_name, labs_by_name):
+        trainer = self._resolve_upload_lab_trainer(batch)
+        if not trainer:
+            return None
+
+        lab, _ = Lab.objects.get_or_create(
+            name=lab_name,
+            batch=batch,
+            defaults={"trainer": trainer},
+        )
+        labs_by_name[lab_name] = lab
+        return lab
+
+    def _resolve_upload_lab_trainer(self, batch):
+        user = self.request.user
+
+        if user.role == "TRAINER":
+            trainer = getattr(user, "trainer_profile", None)
+            if trainer and trainer.batch_id == batch.id:
+                return trainer
+            return None
+
+        return Trainer.objects.filter(batch=batch).order_by("id").first()
 
     def _get_excel_value(self, row_data, column_name):
         value = row_data.get(column_name, "")

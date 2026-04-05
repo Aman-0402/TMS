@@ -8,6 +8,7 @@ const pageTitles = {
   "/audit-logs": "Audit Logs",
   "/batches": "Batches",
   "/students": "Students",
+  "/students/upload": "Student Upload",
   "/trainers": "Trainers",
   "/attendance": "Attendance",
   "/results": "Results",
@@ -22,9 +23,26 @@ function DashboardLayout() {
   const navigationItems = [
     { to: "/", label: "Dashboard", end: true },
     ...(role === "ADMIN" ? [{ to: "/audit-logs", label: "Audit Logs" }] : []),
-    ...(role === "ADMIN" ? [{ to: "/batches", label: "Batches" }, { to: "/students", label: "Students" }] : []),
-    ...(role === "MANAGER" ? [{ to: "/students", label: "Students" }, { to: "/attendance", label: "Attendance" }] : []),
-    ...(role === "TRAINER" ? [{ to: "/results", label: "Results" }] : []),
+    ...(role === "ADMIN"
+      ? [
+          { to: "/batches", label: "Batches" },
+          { to: "/students", label: "Students" },
+          { to: "/students/upload", label: "Student Upload" },
+        ]
+      : []),
+    ...(role === "MANAGER"
+      ? [
+          { to: "/students", label: "Students" },
+          { to: "/students/upload", label: "Student Upload" },
+          { to: "/attendance", label: "Attendance" },
+        ]
+      : []),
+    ...(role === "TRAINER"
+      ? [
+          { to: "/students/upload", label: "Student Upload" },
+          { to: "/results", label: "Results" },
+        ]
+      : []),
     ...(role === "ADMIN" ? [{ to: "/trainers", label: "Trainers" }, { to: "/approvals", label: "Approvals" }] : []),
     ...(role === "MANAGER" ? [{ to: "/approvals", label: "Approvals" }] : []),
   ];

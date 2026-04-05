@@ -2,7 +2,7 @@ from django.db import models
 
 
 class Student(models.Model):
-    ug_number = models.CharField(max_length=50, db_index=True)
+    ug_number = models.CharField(max_length=50, unique=True)
     name = models.CharField(max_length=100)
     department = models.CharField(max_length=100)
     email = models.EmailField(blank=True)
@@ -22,12 +22,6 @@ class Student(models.Model):
 
     class Meta:
         ordering = ["name"]
-        constraints = [
-            models.UniqueConstraint(
-                fields=["batch", "ug_number"],
-                name="unique_student_ug_number_per_batch",
-            ),
-        ]
 
     def __str__(self) -> str:
         return f"{self.name} - {self.batch.name}"
