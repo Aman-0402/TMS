@@ -5,6 +5,7 @@ import DashboardLayout from "../layouts/DashboardLayout";
 import DashboardPage from "../pages/DashboardPage";
 import ModulePage from "../pages/ModulePage";
 import NotFoundPage from "../pages/NotFoundPage";
+import StudentsPage from "../pages/StudentsPage";
 
 function AppRouter() {
   return (
@@ -12,15 +13,7 @@ function AppRouter() {
       <Route element={<DashboardLayout />}>
         <Route index element={<DashboardPage />} />
         <Route path="batches" element={<BatchesPage />} />
-        <Route
-          path="students"
-          element={
-            <ModulePage
-              title="Students"
-              description="Manage student profiles, lab mapping, and batch enrollment."
-            />
-          }
-        />
+        <Route path="students" element={<StudentsPage />} />
         <Route
           path="trainers"
           element={

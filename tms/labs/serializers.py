@@ -4,9 +4,11 @@ from .models import Lab
 
 
 class LabSerializer(serializers.ModelSerializer):
+    batch_name = serializers.CharField(source="batch.name", read_only=True)
+
     class Meta:
         model = Lab
-        fields = ("id", "name", "batch", "trainer")
+        fields = ("id", "name", "batch", "batch_name", "trainer")
         read_only_fields = ("id",)
 
     def validate(self, attrs):

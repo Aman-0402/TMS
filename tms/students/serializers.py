@@ -4,9 +4,21 @@ from .models import Student
 
 
 class StudentSerializer(serializers.ModelSerializer):
+    batch_name = serializers.CharField(source="batch.name", read_only=True)
+    lab_name = serializers.CharField(source="lab.name", read_only=True)
+
     class Meta:
         model = Student
-        fields = ("id", "name", "email", "phone", "batch", "lab")
+        fields = (
+            "id",
+            "name",
+            "email",
+            "phone",
+            "batch",
+            "batch_name",
+            "lab",
+            "lab_name",
+        )
         read_only_fields = ("id",)
 
     def validate(self, attrs):
