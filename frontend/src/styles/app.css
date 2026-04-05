@@ -66,6 +66,20 @@
   width: 2.75rem;
 }
 
+.auth-page {
+  align-items: center;
+  background: linear-gradient(135deg, #eff6ff 0%, #f8fafc 100%);
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 1.5rem;
+}
+
+.auth-card {
+  max-width: 440px;
+  width: 100%;
+}
+
 @media (max-width: 991.98px) {
   .app-shell {
     grid-template-columns: 1fr;

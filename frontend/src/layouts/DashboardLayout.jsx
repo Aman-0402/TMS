@@ -1,4 +1,6 @@
-import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+
+import { useAuth } from "../auth/AuthContext";
 
 const navigationItems = [
   { to: "/", label: "Dashboard", end: true },
@@ -20,7 +22,14 @@ const pageTitles = {
 
 function DashboardLayout() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { logout, user } = useAuth();
   const pageTitle = pageTitles[location.pathname] || "TMS";
+
+  const handleLogout = () => {
+    logout();
+    navigate("/login", { replace: true });
+  };
 
   return (
     <div className="app-shell">
@@ -59,10 +68,15 @@ function DashboardLayout() {
 
           <div className="d-flex align-items-center gap-3">
             <div className="text-end">
-              <div className="fw-semibold text-dark">Admin User</div>
-              <div className="small text-muted">admin@tms.local</div>
+              <div className="fw-semibold text-dark">{user?.username || "Authenticated User"}</div>
+              <div className="small text-muted">JWT Session</div>
             </div>
-            <div className="user-avatar">AU</div>
+            <div className="user-avatar">
+              {(user?.username || "AU").slice(0, 2).toUpperCase()}
+            </div>
+            <button type="button" className="btn btn-outline-danger btn-sm" onClick={handleLogout}>
+              Logout
+            </button>
           </div>
         </header>
 
