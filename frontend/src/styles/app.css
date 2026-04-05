@@ -32,6 +32,10 @@
   color: #fff;
 }
 
+.sidebar-footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
 .content-area {
   background: #f8fafc;
 }
@@ -47,6 +51,19 @@
 
 .content-body {
   padding: 2rem;
+}
+
+.user-avatar {
+  align-items: center;
+  background: #0d6efd;
+  border-radius: 50%;
+  color: #fff;
+  display: inline-flex;
+  font-size: 0.875rem;
+  font-weight: 700;
+  height: 2.75rem;
+  justify-content: center;
+  width: 2.75rem;
 }
 
 @media (max-width: 991.98px) {
