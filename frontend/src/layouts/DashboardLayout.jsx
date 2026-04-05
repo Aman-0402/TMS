@@ -28,7 +28,8 @@ function DashboardLayout() {
 
   const handleLogout = () => {
     logout();
-    navigate("/login", { replace: true });
+    localStorage.removeItem("token");
+    window.location.href = "/login";
   };
 
   return (
@@ -74,7 +75,7 @@ function DashboardLayout() {
             <div className="user-avatar">
               {(user?.username || "AU").slice(0, 2).toUpperCase()}
             </div>
-            <button type="button" className="btn btn-outline-danger btn-sm" onClick={handleLogout}>
+            <button type="button" className="btn btn-danger btn-sm" onClick={handleLogout}>
               Logout
             </button>
           </div>

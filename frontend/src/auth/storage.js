@@ -1,5 +1,5 @@
-const ACCESS_TOKEN_KEY = "tms_access_token";
-const REFRESH_TOKEN_KEY = "tms_refresh_token";
+const ACCESS_TOKEN_KEY = "token";
+const REFRESH_TOKEN_KEY = "refreshToken";
 const AUTH_USER_KEY = "tms_auth_user";
 
 function getStoredAuth() {

@@ -1,6 +1,6 @@
 import { createContext, useContext, useMemo, useState } from "react";
 
-import http from "../api/http";
+import API from "../api/axios";
 import { clearStoredAuth, getStoredAuth, storeAuth } from "./storage";
 
 const AuthContext = createContext(null);
@@ -9,7 +9,7 @@ export function AuthProvider({ children }) {
   const [authState, setAuthState] = useState(getStoredAuth);
 
   const login = async ({ username, password }) => {
-    const response = await http.post("token/", { username, password });
+    const response = await API.post("token/", { username, password });
 
     storeAuth({
       access: response.data.access,
