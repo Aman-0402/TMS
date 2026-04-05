@@ -17,6 +17,7 @@ const pageTitles = {
   "/managers": "Managers",
   "/attendance": "Attendance",
   "/results": "Results",
+  "/results/final-exam": "Final Exam List",
   "/approvals": "Approvals",
 };
 
@@ -52,6 +53,7 @@ function DashboardLayout() {
           { to: "/students/list", label: "Student Directory" },
           { to: "/students/upload", label: "Student Upload" },
           { to: "/attendance", label: "Attendance" },
+          { to: "/results", label: "Results" },
         ]
       : []),
     ...(role === "TRAINER"
@@ -62,7 +64,7 @@ function DashboardLayout() {
           { to: "/results", label: "Results" },
         ]
       : []),
-    ...(role === "ADMIN" ? [{ to: "/approvals", label: "Approvals" }] : []),
+    ...(role === "ADMIN" ? [{ to: "/results", label: "Results" }, { to: "/approvals", label: "Approvals" }] : []),
     ...(role === "MANAGER" ? [{ to: "/approvals", label: "Approvals" }] : []),
   ];
 

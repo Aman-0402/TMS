@@ -26,11 +26,12 @@ class WorkingDaySerializer(serializers.ModelSerializer):
 
 class StudentAttendanceSerializer(serializers.ModelSerializer):
     student_name = serializers.CharField(source="student.name", read_only=True)
+    slot_label = serializers.CharField(source="get_slot_display", read_only=True)
 
     class Meta:
         model = StudentAttendance
-        fields = ("id", "student", "student_name", "batch", "date", "status")
-        read_only_fields = ("id", "student_name")
+        fields = ("id", "student", "student_name", "batch", "date", "slot", "slot_label", "status")
+        read_only_fields = ("id", "student_name", "slot_label")
 
     def validate(self, attrs):
         student = attrs.get("student", getattr(self.instance, "student", None))

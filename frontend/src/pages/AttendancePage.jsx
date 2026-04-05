@@ -8,8 +8,14 @@ import PageHeader from "../components/common/PageHeader";
 
 const STATUS_OPTIONS = [
   { value: "PRESENT", label: "Present", badge: "success" },
-  { value: "ABSENT", label: "Absent", badge: "danger" },
-  { value: "LATE", label: "Late", badge: "warning" },
+  { value: "ABSENT",  label: "Absent",  badge: "danger" },
+  { value: "LATE",    label: "Late",    badge: "warning" },
+];
+
+const SLOTS = [
+  { value: "1", label: "Slot 1" },
+  { value: "2", label: "Slot 2" },
+  { value: "3", label: "Slot 3" },
 ];
 
 function normalizeList(data) {
@@ -25,14 +31,14 @@ function formatDate(dateStr) {
 }
 
 // ---------------------------------------------------------------------------
-// Manager sub-view: manage working days
+// Manager: manage working days
 // ---------------------------------------------------------------------------
 function WorkingDaysManager({ batches }) {
   const [selectedBatch, setSelectedBatch] = useState("");
-  const [workingDays, setWorkingDays] = useState([]);
-  const [newDate, setNewDate] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [isAdding, setIsAdding] = useState(false);
+  const [workingDays, setWorkingDays]     = useState([]);
+  const [newDate, setNewDate]             = useState("");
+  const [isLoading, setIsLoading]         = useState(false);
+  const [isAdding, setIsAdding]           = useState(false);
 
   const loadWorkingDays = async (batchId) => {
     if (!batchId) return;
@@ -47,9 +53,7 @@ function WorkingDaysManager({ batches }) {
     }
   };
 
-  useEffect(() => {
-    loadWorkingDays(selectedBatch);
-  }, [selectedBatch]);
+  useEffect(() => { loadWorkingDays(selectedBatch); }, [selectedBatch]);
 
   const handleAddDay = async (e) => {
     e.preventDefault();
@@ -82,7 +86,6 @@ function WorkingDaysManager({ batches }) {
       confirmButtonText: "Remove",
     });
     if (!result.isConfirmed) return;
-
     try {
       await http.delete(`working-days/${day.id}/`);
       toast.success("Working day removed.");
@@ -101,13 +104,11 @@ function WorkingDaysManager({ batches }) {
           <div className="card-body p-4">
             <h2 className="h5 mb-3">Add Working Day</h2>
             <p className="text-secondary mb-4 small">
-              Select a batch and add dates that trainers can mark attendance for.
+              Select a batch and add dates that trainers can mark attendance for. Each day has 3 slots.
             </p>
 
             <div className="mb-3">
-              <label className="form-label" htmlFor="wd-batch">
-                Batch
-              </label>
+              <label className="form-label" htmlFor="wd-batch">Batch</label>
               <select
                 id="wd-batch"
                 className="form-select"
@@ -116,9 +117,7 @@ function WorkingDaysManager({ batches }) {
               >
                 <option value="">Select batch</option>
                 {batches.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
-                  </option>
+                  <option key={b.id} value={b.id}>{b.name}</option>
                 ))}
               </select>
             </div>
@@ -126,9 +125,7 @@ function WorkingDaysManager({ batches }) {
             {selectedBatch && (
               <form onSubmit={handleAddDay}>
                 <div className="mb-3">
-                  <label className="form-label" htmlFor="wd-date">
-                    Date
-                  </label>
+                  <label className="form-label" htmlFor="wd-date">Date</label>
                   <input
                     id="wd-date"
                     type="date"
@@ -145,19 +142,10 @@ function WorkingDaysManager({ batches }) {
                     </div>
                   )}
                 </div>
-                <button
-                  type="submit"
-                  className="btn btn-primary w-100"
-                  disabled={isAdding}
-                >
+                <button type="submit" className="btn btn-primary w-100" disabled={isAdding}>
                   {isAdding ? (
-                    <>
-                      <span className="spinner-border spinner-border-sm me-2" aria-hidden="true" />
-                      Adding...
-                    </>
-                  ) : (
-                    "Add Working Day"
-                  )}
+                    <><span className="spinner-border spinner-border-sm me-2" aria-hidden="true" />Adding...</>
+                  ) : "Add Working Day"}
                 </button>
               </form>
             )}
@@ -169,19 +157,11 @@ function WorkingDaysManager({ batches }) {
         <div className="card shadow-sm border-0">
           <div className="card-body">
             <h2 className="h5 mb-3">Working Days</h2>
-
-            {!selectedBatch && (
-              <p className="text-secondary mb-0">Select a batch to view working days.</p>
-            )}
-
-            {selectedBatch && isLoading && (
-              <p className="text-secondary mb-0">Loading...</p>
-            )}
-
+            {!selectedBatch && <p className="text-secondary mb-0">Select a batch to view working days.</p>}
+            {selectedBatch && isLoading && <p className="text-secondary mb-0">Loading...</p>}
             {selectedBatch && !isLoading && workingDays.length === 0 && (
               <div className="alert alert-light mb-0">No working days added yet.</div>
             )}
-
             {selectedBatch && !isLoading && workingDays.length > 0 && (
               <div className="table-responsive">
                 <table className="table table-hover align-middle mb-0">
@@ -190,6 +170,7 @@ function WorkingDaysManager({ batches }) {
                       <th>#</th>
                       <th>Date</th>
                       <th>Day</th>
+                      <th>Slots</th>
                       <th className="text-end">Action</th>
                     </tr>
                   </thead>
@@ -198,8 +179,11 @@ function WorkingDaysManager({ batches }) {
                       <tr key={day.id}>
                         <td className="text-muted">{idx + 1}</td>
                         <td>{formatDate(day.date)}</td>
+                        <td>{new Date(day.date).toLocaleDateString("en-IN", { weekday: "long" })}</td>
                         <td>
-                          {new Date(day.date).toLocaleDateString("en-IN", { weekday: "long" })}
+                          <span className="badge bg-secondary">Slot 1</span>{" "}
+                          <span className="badge bg-secondary">Slot 2</span>{" "}
+                          <span className="badge bg-secondary">Slot 3</span>
                         </td>
                         <td className="text-end">
                           <button
@@ -224,57 +208,35 @@ function WorkingDaysManager({ batches }) {
 }
 
 // ---------------------------------------------------------------------------
-// Manager sub-view: view attendance report
+// Manager: attendance report
 // ---------------------------------------------------------------------------
 function AttendanceReport({ batches }) {
   const [selectedBatch, setSelectedBatch] = useState("");
-  const [selectedDate, setSelectedDate] = useState("");
-  const [workingDays, setWorkingDays] = useState([]);
-  const [records, setRecords] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
-
-  const loadWorkingDays = async (batchId) => {
-    if (!batchId) return;
-    try {
-      const res = await http.get(`working-days/?batch=${batchId}`);
-      setWorkingDays(normalizeList(res.data));
-    } catch {
-      // silently fail
-    }
-  };
+  const [selectedDate, setSelectedDate]   = useState("");
+  const [selectedSlot, setSelectedSlot]   = useState("1");
+  const [workingDays, setWorkingDays]     = useState([]);
+  const [records, setRecords]             = useState([]);
+  const [isLoading, setIsLoading]         = useState(false);
 
   useEffect(() => {
-    loadWorkingDays(selectedBatch);
+    if (!selectedBatch) { setWorkingDays([]); setSelectedDate(""); setRecords([]); return; }
+    http.get(`working-days/?batch=${selectedBatch}`)
+      .then((res) => setWorkingDays(normalizeList(res.data)))
+      .catch(() => {});
     setSelectedDate("");
     setRecords([]);
   }, [selectedBatch]);
 
-  const loadAttendance = async () => {
-    if (!selectedBatch || !selectedDate) return;
-    setIsLoading(true);
-    try {
-      const res = await http.get(
-        `student-attendance/?batch=${selectedBatch}&date=${selectedDate}`
-      );
-      setRecords(normalizeList(res.data));
-    } catch {
-      toast.error("Failed to load attendance.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   useEffect(() => {
-    loadAttendance();
-  }, [selectedDate]);
+    if (!selectedBatch || !selectedDate) { setRecords([]); return; }
+    setIsLoading(true);
+    http.get(`student-attendance/?batch=${selectedBatch}&date=${selectedDate}&slot=${selectedSlot}`)
+      .then((res) => setRecords(normalizeList(res.data)))
+      .catch(() => toast.error("Failed to load attendance."))
+      .finally(() => setIsLoading(false));
+  }, [selectedDate, selectedSlot, selectedBatch]);
 
-  const summary = records.reduce(
-    (acc, r) => {
-      acc[r.status] = (acc[r.status] || 0) + 1;
-      return acc;
-    },
-    {}
-  );
+  const summary = records.reduce((acc, r) => { acc[r.status] = (acc[r.status] || 0) + 1; return acc; }, {});
 
   return (
     <div className="row g-4">
@@ -282,42 +244,24 @@ function AttendanceReport({ batches }) {
         <div className="card shadow-sm border-0">
           <div className="card-body p-4">
             <div className="row g-3 align-items-end">
-              <div className="col-sm-5">
-                <label className="form-label" htmlFor="rep-batch">
-                  Batch
-                </label>
-                <select
-                  id="rep-batch"
-                  className="form-select"
-                  value={selectedBatch}
-                  onChange={(e) => setSelectedBatch(e.target.value)}
-                >
+              <div className="col-sm-4">
+                <label className="form-label" htmlFor="rep-batch">Batch</label>
+                <select id="rep-batch" className="form-select" value={selectedBatch} onChange={(e) => setSelectedBatch(e.target.value)}>
                   <option value="">Select batch</option>
-                  {batches.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name}
-                    </option>
-                  ))}
+                  {batches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
                 </select>
               </div>
-
-              <div className="col-sm-5">
-                <label className="form-label" htmlFor="rep-date">
-                  Working Day
-                </label>
-                <select
-                  id="rep-date"
-                  className="form-select"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  disabled={!selectedBatch || workingDays.length === 0}
-                >
+              <div className="col-sm-4">
+                <label className="form-label" htmlFor="rep-date">Working Day</label>
+                <select id="rep-date" className="form-select" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} disabled={!selectedBatch || workingDays.length === 0}>
                   <option value="">Select date</option>
-                  {workingDays.map((d) => (
-                    <option key={d.id} value={d.date}>
-                      {formatDate(d.date)}
-                    </option>
-                  ))}
+                  {workingDays.map((d) => <option key={d.id} value={d.date}>{formatDate(d.date)}</option>)}
+                </select>
+              </div>
+              <div className="col-sm-4">
+                <label className="form-label" htmlFor="rep-slot">Slot</label>
+                <select id="rep-slot" className="form-select" value={selectedSlot} onChange={(e) => setSelectedSlot(e.target.value)} disabled={!selectedDate}>
+                  {SLOTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
                 </select>
               </div>
             </div>
@@ -331,7 +275,7 @@ function AttendanceReport({ batches }) {
             <div className="card-body">
               <div className="d-flex justify-content-between align-items-center mb-3">
                 <h2 className="h5 mb-0">
-                  Attendance — {formatDate(selectedDate)}
+                  {formatDate(selectedDate)} — Slot {selectedSlot}
                 </h2>
                 {records.length > 0 && (
                   <div className="d-flex gap-2">
@@ -345,22 +289,14 @@ function AttendanceReport({ batches }) {
               </div>
 
               {isLoading && <p className="text-secondary">Loading...</p>}
-
               {!isLoading && records.length === 0 && (
-                <div className="alert alert-light mb-0">
-                  No attendance records for this date.
-                </div>
+                <div className="alert alert-light mb-0">No attendance records for this slot.</div>
               )}
-
               {!isLoading && records.length > 0 && (
                 <div className="table-responsive">
                   <table className="table table-hover align-middle mb-0">
                     <thead className="table-light">
-                      <tr>
-                        <th>#</th>
-                        <th>Student</th>
-                        <th>Status</th>
-                      </tr>
+                      <tr><th>#</th><th>Student</th><th>Status</th></tr>
                     </thead>
                     <tbody>
                       {records.map((r, idx) => {
@@ -369,11 +305,7 @@ function AttendanceReport({ batches }) {
                           <tr key={r.id}>
                             <td className="text-muted">{idx + 1}</td>
                             <td>{r.student_name}</td>
-                            <td>
-                              <span className={`badge bg-${opt?.badge || "secondary"}`}>
-                                {opt?.label || r.status}
-                              </span>
-                            </td>
+                            <td><span className={`badge bg-${opt?.badge || "secondary"}`}>{opt?.label || r.status}</span></td>
                           </tr>
                         );
                       })}
@@ -390,171 +322,119 @@ function AttendanceReport({ batches }) {
 }
 
 // ---------------------------------------------------------------------------
-// Trainer sub-view: mark attendance
+// Trainer: mark attendance per slot
 // ---------------------------------------------------------------------------
 function TrainerAttendanceMarker() {
-  const [batches, setBatches] = useState([]);
+  const [batches, setBatches]           = useState([]);
   const [selectedBatch, setSelectedBatch] = useState("");
-  const [workingDays, setWorkingDays] = useState([]);
+  const [workingDays, setWorkingDays]   = useState([]);
   const [selectedDate, setSelectedDate] = useState("");
-  const [students, setStudents] = useState([]);
-  const [statusMap, setStatusMap] = useState({});
-  const [existingMap, setExistingMap] = useState({});
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
+  const [selectedSlot, setSelectedSlot] = useState("1");
+  const [students, setStudents]         = useState([]);
+  const [statusMap, setStatusMap]       = useState({});
+  const [isLoading, setIsLoading]       = useState(false);
+  const [isSaving, setIsSaving]         = useState(false);
 
   useEffect(() => {
     http.get("batches/").then((res) => setBatches(normalizeList(res.data))).catch(() => {});
   }, []);
 
   useEffect(() => {
-    if (!selectedBatch) {
-      setWorkingDays([]);
-      setSelectedDate("");
-      return;
-    }
-    http
-      .get(`working-days/?batch=${selectedBatch}`)
+    if (!selectedBatch) { setWorkingDays([]); setSelectedDate(""); return; }
+    http.get(`working-days/?batch=${selectedBatch}`)
       .then((res) => setWorkingDays(normalizeList(res.data)))
       .catch(() => {});
     setSelectedDate("");
   }, [selectedBatch]);
 
+  // Reload attendance whenever date or slot changes
   useEffect(() => {
-    if (!selectedBatch || !selectedDate) {
-      setStudents([]);
-      setStatusMap({});
-      return;
-    }
+    if (!selectedBatch || !selectedDate) { setStudents([]); setStatusMap({}); return; }
     setIsLoading(true);
-
     Promise.all([
       http.get(`students/?batch=${selectedBatch}`),
-      http.get(`student-attendance/?batch=${selectedBatch}&date=${selectedDate}`),
+      http.get(`student-attendance/?batch=${selectedBatch}&date=${selectedDate}&slot=${selectedSlot}`),
     ])
       .then(([studRes, attRes]) => {
         const studentList = normalizeList(studRes.data);
-        const attList = normalizeList(attRes.data);
-
-        const existing = {};
-        attList.forEach((r) => {
-          existing[r.student] = { id: r.id, status: r.status };
-        });
-
-        const initialMap = {};
-        studentList.forEach((s) => {
-          initialMap[s.id] = existing[s.id]?.status || "PRESENT";
-        });
-
+        const attList     = normalizeList(attRes.data);
+        const existingMap = {};
+        attList.forEach((r) => { existingMap[r.student] = r.status; });
+        const initial = {};
+        studentList.forEach((s) => { initial[s.id] = existingMap[s.id] || "PRESENT"; });
         setStudents(studentList);
-        setExistingMap(existing);
-        setStatusMap(initialMap);
+        setStatusMap(initial);
       })
-      .catch(() => toast.error("Failed to load students or attendance."))
+      .catch(() => toast.error("Failed to load data."))
       .finally(() => setIsLoading(false));
-  }, [selectedBatch, selectedDate]);
+  }, [selectedBatch, selectedDate, selectedSlot]);
 
-  const handleStatusChange = (studentId, value) => {
+  const handleStatusChange = (studentId, value) =>
     setStatusMap((prev) => ({ ...prev, [studentId]: value }));
-  };
 
-  const handleMarkAll = (value) => {
+  const handleMarkAll = (value) =>
     setStatusMap((prev) => {
       const updated = { ...prev };
-      students.forEach((s) => {
-        updated[s.id] = value;
-      });
+      students.forEach((s) => { updated[s.id] = value; });
       return updated;
     });
-  };
 
   const handleSave = async () => {
     if (!selectedBatch || !selectedDate || students.length === 0) return;
-
     setIsSaving(true);
     try {
-      const records = students.map((s) => ({
-        student: s.id,
-        status: statusMap[s.id] || "PRESENT",
-      }));
-
       await http.post("student-attendance/bulk-mark/", {
         batch: Number(selectedBatch),
         date: selectedDate,
-        records,
+        slot: selectedSlot,
+        records: students.map((s) => ({ student: s.id, status: statusMap[s.id] || "PRESENT" })),
       });
-
-      toast.success("Attendance saved successfully.");
-      // reload to show updated state
-      const attRes = await http.get(
-        `student-attendance/?batch=${selectedBatch}&date=${selectedDate}`
-      );
-      const attList = normalizeList(attRes.data);
-      const updated = {};
-      attList.forEach((r) => {
-        updated[r.student] = { id: r.id, status: r.status };
-      });
-      setExistingMap(updated);
+      toast.success(`Attendance saved for ${SLOTS.find((s) => s.value === selectedSlot)?.label}.`);
     } catch (err) {
-      toast.error(
-        err.response?.data?.error || "Failed to save attendance."
-      );
+      toast.error(err.response?.data?.error || "Failed to save attendance.");
     } finally {
       setIsSaving(false);
     }
   };
 
-  const presentCount = Object.values(statusMap).filter((v) => v === "PRESENT").length;
-  const absentCount = Object.values(statusMap).filter((v) => v === "ABSENT").length;
-  const lateCount = Object.values(statusMap).filter((v) => v === "LATE").length;
+  const counts = STATUS_OPTIONS.reduce((acc, s) => {
+    acc[s.value] = Object.values(statusMap).filter((v) => v === s.value).length;
+    return acc;
+  }, {});
 
   return (
     <div className="row g-4">
+      {/* Selectors */}
       <div className="col-12">
         <div className="card shadow-sm border-0">
           <div className="card-body p-4">
             <div className="row g-3 align-items-end">
-              <div className="col-sm-5">
-                <label className="form-label" htmlFor="tr-batch">
-                  Your Batch
-                </label>
-                <select
-                  id="tr-batch"
-                  className="form-select"
-                  value={selectedBatch}
-                  onChange={(e) => setSelectedBatch(e.target.value)}
-                >
+              <div className="col-sm-4">
+                <label className="form-label" htmlFor="tr-batch">Your Batch</label>
+                <select id="tr-batch" className="form-select" value={selectedBatch} onChange={(e) => setSelectedBatch(e.target.value)}>
                   <option value="">Select batch</option>
-                  {batches.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name}
+                  {batches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
+              </div>
+
+              <div className="col-sm-4">
+                <label className="form-label" htmlFor="tr-date">Working Day</label>
+                <select id="tr-date" className="form-select" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} disabled={!selectedBatch || workingDays.length === 0}>
+                  <option value="">
+                    {workingDays.length === 0 && selectedBatch ? "No working days set" : "Select date"}
+                  </option>
+                  {workingDays.map((d) => (
+                    <option key={d.id} value={d.date}>
+                      {formatDate(d.date)} — {new Date(d.date).toLocaleDateString("en-IN", { weekday: "short" })}
                     </option>
                   ))}
                 </select>
               </div>
 
-              <div className="col-sm-5">
-                <label className="form-label" htmlFor="tr-date">
-                  Working Day
-                </label>
-                <select
-                  id="tr-date"
-                  className="form-select"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  disabled={!selectedBatch || workingDays.length === 0}
-                >
-                  <option value="">
-                    {workingDays.length === 0 && selectedBatch
-                      ? "No working days set"
-                      : "Select date"}
-                  </option>
-                  {workingDays.map((d) => (
-                    <option key={d.id} value={d.date}>
-                      {formatDate(d.date)} —{" "}
-                      {new Date(d.date).toLocaleDateString("en-IN", { weekday: "short" })}
-                    </option>
-                  ))}
+              <div className="col-sm-4">
+                <label className="form-label" htmlFor="tr-slot">Slot</label>
+                <select id="tr-slot" className="form-select" value={selectedSlot} onChange={(e) => setSelectedSlot(e.target.value)} disabled={!selectedDate}>
+                  {SLOTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
                 </select>
               </div>
             </div>
@@ -562,18 +442,18 @@ function TrainerAttendanceMarker() {
         </div>
       </div>
 
+      {/* Attendance table */}
       {selectedDate && (
         <div className="col-12">
           <div className="card shadow-sm border-0">
             <div className="card-body">
               <div className="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
                 <h2 className="h5 mb-0">
-                  Mark Attendance — {formatDate(selectedDate)}
+                  {formatDate(selectedDate)} — {SLOTS.find((s) => s.value === selectedSlot)?.label}
                 </h2>
-
                 {students.length > 0 && (
-                  <div className="d-flex gap-2 flex-wrap">
-                    <span className="text-muted small align-self-center">Mark all:</span>
+                  <div className="d-flex gap-2 flex-wrap align-items-center">
+                    <span className="text-muted small">Mark all:</span>
                     {STATUS_OPTIONS.map((s) => (
                       <button
                         key={s.value}
@@ -604,7 +484,9 @@ function TrainerAttendanceMarker() {
                           <th>#</th>
                           <th>Student</th>
                           <th>UG No.</th>
-                          <th>Attendance</th>
+                          <th>Slot 1</th>
+                          <th>Slot 2</th>
+                          <th>Slot 3</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -613,30 +495,36 @@ function TrainerAttendanceMarker() {
                             <td className="text-muted">{idx + 1}</td>
                             <td>{student.name}</td>
                             <td className="text-muted">{student.ug_number}</td>
-                            <td>
-                              <div className="d-flex gap-2">
-                                {STATUS_OPTIONS.map((opt) => (
-                                  <div className="form-check form-check-inline mb-0" key={opt.value}>
-                                    <input
-                                      className="form-check-input"
-                                      type="radio"
-                                      id={`att-${student.id}-${opt.value}`}
-                                      name={`att-${student.id}`}
-                                      value={opt.value}
-                                      checked={statusMap[student.id] === opt.value}
-                                      onChange={() => handleStatusChange(student.id, opt.value)}
-                                      disabled={isSaving}
-                                    />
-                                    <label
-                                      className="form-check-label"
-                                      htmlFor={`att-${student.id}-${opt.value}`}
-                                    >
-                                      <span className={`text-${opt.badge}`}>{opt.label}</span>
-                                    </label>
+                            {SLOTS.map((slot) => (
+                              <td key={slot.value}>
+                                {slot.value === selectedSlot ? (
+                                  <div className="d-flex gap-2">
+                                    {STATUS_OPTIONS.map((opt) => (
+                                      <div className="form-check form-check-inline mb-0" key={opt.value}>
+                                        <input
+                                          className="form-check-input"
+                                          type="radio"
+                                          id={`att-${student.id}-${opt.value}`}
+                                          name={`att-${student.id}`}
+                                          value={opt.value}
+                                          checked={statusMap[student.id] === opt.value}
+                                          onChange={() => handleStatusChange(student.id, opt.value)}
+                                          disabled={isSaving}
+                                        />
+                                        <label
+                                          className="form-check-label"
+                                          htmlFor={`att-${student.id}-${opt.value}`}
+                                        >
+                                          <span className={`text-${opt.badge}`}>{opt.label}</span>
+                                        </label>
+                                      </div>
+                                    ))}
                                   </div>
-                                ))}
-                              </div>
-                            </td>
+                                ) : (
+                                  <span className="text-muted small">—</span>
+                                )}
+                              </td>
+                            ))}
                           </tr>
                         ))}
                       </tbody>
@@ -645,9 +533,11 @@ function TrainerAttendanceMarker() {
 
                   <div className="d-flex justify-content-between align-items-center flex-wrap gap-3">
                     <div className="d-flex gap-3">
-                      <span className="badge bg-success fs-6">Present: {presentCount}</span>
-                      <span className="badge bg-warning text-dark fs-6">Late: {lateCount}</span>
-                      <span className="badge bg-danger fs-6">Absent: {absentCount}</span>
+                      {STATUS_OPTIONS.map((s) => (
+                        <span key={s.value} className={`badge bg-${s.badge} fs-6`}>
+                          {s.label}: {counts[s.value] || 0}
+                        </span>
+                      ))}
                     </div>
                     <button
                       type="button"
@@ -656,13 +546,8 @@ function TrainerAttendanceMarker() {
                       disabled={isSaving || students.length === 0}
                     >
                       {isSaving ? (
-                        <>
-                          <span className="spinner-border spinner-border-sm me-2" aria-hidden="true" />
-                          Saving...
-                        </>
-                      ) : (
-                        "Save Attendance"
-                      )}
+                        <><span className="spinner-border spinner-border-sm me-2" aria-hidden="true" />Saving...</>
+                      ) : `Save ${SLOTS.find((s) => s.value === selectedSlot)?.label} Attendance`}
                     </button>
                   </div>
                 </>
@@ -679,29 +564,23 @@ function TrainerAttendanceMarker() {
 // Main page
 // ---------------------------------------------------------------------------
 function AttendancePage() {
-  const role = getRole();
+  const role      = getRole();
   const isManager = role === "ADMIN" || role === "MANAGER";
   const isTrainer = role === "TRAINER";
 
-  const [batches, setBatches] = useState([]);
+  const [batches, setBatches]     = useState([]);
   const [activeTab, setActiveTab] = useState("working-days");
 
   useEffect(() => {
     if (isManager) {
-      http
-        .get("batches/")
-        .then((res) => setBatches(normalizeList(res.data)))
-        .catch(() => {});
+      http.get("batches/").then((res) => setBatches(normalizeList(res.data))).catch(() => {});
     }
   }, [isManager]);
 
   if (isTrainer) {
     return (
       <>
-        <PageHeader
-          title="Attendance"
-          description="Mark student attendance for working days in your batch."
-        />
+        <PageHeader title="Attendance" description="Mark student attendance per slot for working days in your batch." />
         <TrainerAttendanceMarker />
       </>
     );
@@ -709,34 +588,27 @@ function AttendancePage() {
 
   return (
     <>
-      <PageHeader
-        title="Attendance"
-        description="Manage working days and review student attendance records."
-      />
+      <PageHeader title="Attendance" description="Manage working days and review student attendance. Each working day has 3 class slots." />
 
       <ul className="nav nav-tabs mb-4">
-        <li className="nav-item">
-          <button
-            type="button"
-            className={`nav-link${activeTab === "working-days" ? " active" : ""}`}
-            onClick={() => setActiveTab("working-days")}
-          >
-            Working Days
-          </button>
-        </li>
-        <li className="nav-item">
-          <button
-            type="button"
-            className={`nav-link${activeTab === "report" ? " active" : ""}`}
-            onClick={() => setActiveTab("report")}
-          >
-            Attendance Report
-          </button>
-        </li>
+        {[
+          { key: "working-days", label: "Working Days" },
+          { key: "report",       label: "Attendance Report" },
+        ].map((tab) => (
+          <li className="nav-item" key={tab.key}>
+            <button
+              type="button"
+              className={`nav-link${activeTab === tab.key ? " active" : ""}`}
+              onClick={() => setActiveTab(tab.key)}
+            >
+              {tab.label}
+            </button>
+          </li>
+        ))}
       </ul>
 
       {activeTab === "working-days" && <WorkingDaysManager batches={batches} />}
-      {activeTab === "report" && <AttendanceReport batches={batches} />}
+      {activeTab === "report"       && <AttendanceReport   batches={batches} />}
     </>
   );
 }

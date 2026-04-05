@@ -10,6 +10,7 @@ import Login from "./pages/Login";
 import ManagersPage from "./pages/ManagersPage";
 import AttendancePage from "./pages/AttendancePage";
 import ModulePage from "./pages/ModulePage";
+import ResultsPage from "./pages/ResultsPage";
 import NotFoundPage from "./pages/NotFoundPage";
 import ApprovalPage from "./pages/ApprovalPage";
 import RegisterPage from "./pages/RegisterPage";
@@ -134,10 +135,7 @@ function App() {
           path="results"
           element={
             <PrivateRoute allowedRoles={["ADMIN", "MANAGER", "TRAINER"]}>
-              <ModulePage
-                title="Results"
-                description="Review scores, totals, and pass or fail status."
-              />
+              <ResultsPage />
             </PrivateRoute>
           }
         />

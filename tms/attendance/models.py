@@ -35,6 +35,11 @@ class StudentAttendance(models.Model):
         ABSENT = "ABSENT", "Absent"
         LATE = "LATE", "Late"
 
+    class Slot(models.TextChoices):
+        SLOT_1 = "1", "Slot 1"
+        SLOT_2 = "2", "Slot 2"
+        SLOT_3 = "3", "Slot 3"
+
     student = models.ForeignKey(
         "students.Student",
         on_delete=models.CASCADE,
@@ -46,6 +51,12 @@ class StudentAttendance(models.Model):
         related_name="student_attendance_records",
     )
     date = models.DateField(db_index=True)
+    slot = models.CharField(
+        max_length=1,
+        choices=Slot.choices,
+        default=Slot.SLOT_1,
+        db_index=True,
+    )
     status = models.CharField(
         max_length=20,
         choices=Status.choices,
@@ -53,16 +64,16 @@ class StudentAttendance(models.Model):
     )
 
     class Meta:
-        ordering = ["-date", "student__name"]
+        ordering = ["-date", "slot", "student__name"]
         constraints = [
             models.UniqueConstraint(
-                fields=["student", "date"],
-                name="unique_student_attendance_per_day",
+                fields=["student", "date", "slot"],
+                name="unique_student_attendance_per_slot",
             ),
         ]
 
     def __str__(self) -> str:
-        return f"{self.student.name} - {self.date} - {self.status}"
+        return f"{self.student.name} - {self.date} - Slot {self.slot} - {self.status}"
 
 
 class TrainerAttendance(models.Model):
