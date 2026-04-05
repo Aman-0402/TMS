@@ -8,6 +8,7 @@ from accounts.views import (
     AvailableTrainerUserListView,
     ManagerViewSet,
 )
+from attendance.views import StudentAttendanceViewSet, WorkingDayViewSet
 from batch.views import BatchViewSet, CourseViewSet
 from labs.views import LabViewSet
 from results.views import ResultViewSet
@@ -21,6 +22,8 @@ router.register("labs", LabViewSet, basename="lab")
 router.register("trainers", TrainerViewSet, basename="trainer")
 router.register("managers", ManagerViewSet, basename="manager")
 router.register("results", ResultViewSet, basename="result")
+router.register("working-days", WorkingDayViewSet, basename="working-day")
+router.register("student-attendance", StudentAttendanceViewSet, basename="student-attendance")
 
 urlpatterns = router.urls + [
     path("trainer-users/", AvailableTrainerUserListView.as_view(), name="trainer-users"),

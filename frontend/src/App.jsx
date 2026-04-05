@@ -8,6 +8,7 @@ import DashboardPage from "./pages/DashboardPage";
 import LabsPage from "./pages/LabsPage";
 import Login from "./pages/Login";
 import ManagersPage from "./pages/ManagersPage";
+import AttendancePage from "./pages/AttendancePage";
 import ModulePage from "./pages/ModulePage";
 import NotFoundPage from "./pages/NotFoundPage";
 import ApprovalPage from "./pages/ApprovalPage";
@@ -124,11 +125,8 @@ function App() {
         <Route
           path="attendance"
           element={
-            <PrivateRoute allowedRoles={["ADMIN", "MANAGER"]}>
-              <ModulePage
-                title="Attendance"
-                description="Capture student and trainer attendance records by date."
-              />
+            <PrivateRoute allowedRoles={["ADMIN", "MANAGER", "TRAINER"]}>
+              <AttendancePage />
             </PrivateRoute>
           }
         />

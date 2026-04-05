@@ -1,10 +1,39 @@
 from django.db import models
 
 
+class WorkingDay(models.Model):
+    batch = models.ForeignKey(
+        "batch.Batch",
+        on_delete=models.CASCADE,
+        related_name="working_days",
+    )
+    date = models.DateField(db_index=True)
+    created_by = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_working_days",
+    )
+
+    class Meta:
+        ordering = ["date"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["batch", "date"],
+                name="unique_working_day_per_batch",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.batch.name} - {self.date}"
+
+
 class StudentAttendance(models.Model):
     class Status(models.TextChoices):
         PRESENT = "PRESENT", "Present"
         ABSENT = "ABSENT", "Absent"
+        LATE = "LATE", "Late"
 
     student = models.ForeignKey(
         "students.Student",
