@@ -223,6 +223,7 @@ function StudentsListPage() {
                 <table className="table table-hover align-middle mb-0">
                   <thead className="table-light">
                     <tr>
+                      <th scope="col" style={{ width: '60px' }}>S. No</th>
                       <th scope="col" className="sortable" onClick={() => handleSort('ug_number')} style={{ cursor: 'pointer' }}>
                         UG Number {sortField === 'ug_number' && (sortDirection === 'asc' ? '↑' : '↓')}
                       </th>
@@ -243,8 +244,9 @@ function StudentsListPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredStudents.map((student) => (
+                    {filteredStudents.map((student, index) => (
                       <tr key={student.id}>
+                        <td className="text-muted fw-semibold">{index + 1}</td>
                         <td className="fw-semibold">{student.ug_number}</td>
                         <td>{student.name}</td>
                         <td>{student.department}</td>
