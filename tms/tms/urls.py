@@ -18,7 +18,16 @@ from django.contrib import admin
 from django.urls import include, path
 from rest_framework_simplejwt.views import TokenRefreshView
 
-from accounts.views import ApproveUserView, CustomLoginView, PendingUserListView, RegisterView, RejectUserView
+from accounts.views import (
+    AdminUserDetailView,
+    AdminUserListView,
+    ApproveUserView,
+    CustomLoginView,
+    MyProfileView,
+    PendingUserListView,
+    RegisterView,
+    RejectUserView,
+)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -29,6 +38,9 @@ urlpatterns = [
     path('api/pending-users/', PendingUserListView.as_view()),
     path('api/approve-user/<int:pk>/', ApproveUserView.as_view()),
     path('api/reject-user/<int:pk>/', RejectUserView.as_view()),
+    path('api/profile/me/', MyProfileView.as_view()),
+    path('api/users/', AdminUserListView.as_view()),
+    path('api/users/<int:pk>/', AdminUserDetailView.as_view()),
     path('api/token/', CustomLoginView.as_view()),
     path('api/token/refresh/', TokenRefreshView.as_view()),
 ]

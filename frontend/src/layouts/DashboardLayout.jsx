@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../auth/AuthContext";
 import { getRole } from "../utils/auth";
@@ -18,19 +18,27 @@ const pageTitles = {
   "/results": "Results",
   "/mock-results": "Mock Results",
   "/approvals": "Approvals",
+  "/profile": "My Profile",
+  "/admin/users": "User Management",
 };
 
 function DashboardLayout() {
-  const location = useLocation();
+  const location  = useLocation();
+  const navigate  = useNavigate();
   const { logout, user } = useAuth();
-  const role = getRole();
+  const role      = getRole();
   const pageTitle = pageTitles[location.pathname] || "TMS";
 
   const navigationItems = [
     { to: "/", label: "Dashboard", end: true },
 
     // ── ADMIN ──────────────────────────────────────────────────────────────
-    ...(role === "ADMIN" ? [{ to: "/audit-logs", label: "Audit Logs" }] : []),
+    ...(role === "ADMIN"
+      ? [
+          { to: "/audit-logs",   label: "Audit Logs"       },
+          { to: "/admin/users",  label: "User Management"  },
+        ]
+      : []),
 
     ...(role === "ADMIN" || role === "MANAGER"
       ? [
@@ -75,6 +83,9 @@ function DashboardLayout() {
           { to: "/results",        label: "Results"           },
         ]
       : []),
+
+    // ── All roles ─────────────────────────────────────────────────────────
+    { to: "/profile", label: "My Profile" },
   ];
 
   const handleLogout = () => {
@@ -122,9 +133,15 @@ function DashboardLayout() {
               <div className="fw-semibold text-dark">{user?.username || "Authenticated User"}</div>
               <div className="small text-muted">{role || "JWT Session"}</div>
             </div>
-            <div className="user-avatar">
+            <button
+              type="button"
+              className="user-avatar border-0 p-0"
+              style={{ cursor: "pointer" }}
+              title="My Profile"
+              onClick={() => navigate("/profile")}
+            >
               {(user?.username || "AU").slice(0, 2).toUpperCase()}
-            </div>
+            </button>
             <button type="button" className="btn btn-danger btn-sm" onClick={handleLogout}>
               Logout
             </button>

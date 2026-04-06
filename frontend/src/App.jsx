@@ -1,6 +1,7 @@
 import { Route, Routes } from "react-router-dom";
 
 import DashboardLayout from "./layouts/DashboardLayout";
+import AdminUsersPage from "./pages/AdminUsersPage";
 import AttendancePage from "./pages/AttendancePage";
 import AuditLogsPage from "./pages/AuditLogsPage";
 import BatchesPage from "./pages/BatchesPage";
@@ -19,6 +20,7 @@ import StudentsListPage from "./pages/StudentsListPage";
 import StudentUploadPage from "./pages/StudentUploadPage";
 import TrainersPage from "./pages/TrainersPage";
 import TrainerMockResultsPage from "./pages/TrainerMockResultsPage";
+import ProfilePage from "./pages/ProfilePage";
 import PrivateRoute from "./routes/PrivateRoute";
 
 function App() {
@@ -150,6 +152,24 @@ function App() {
           element={
             <PrivateRoute allowedRoles={["TRAINER"]}>
               <TrainerMockResultsPage />
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="profile"
+          element={
+            <PrivateRoute>
+              <ProfilePage />
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="admin/users"
+          element={
+            <PrivateRoute allowedRoles={["ADMIN"]}>
+              <AdminUsersPage />
             </PrivateRoute>
           }
         />

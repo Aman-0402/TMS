@@ -1,3 +1,4 @@
+from django.db.models import Q
 from rest_framework import generics, permissions, status, viewsets
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
@@ -7,6 +8,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from .models import AuditLog, Manager, User
 from .permissions import IsAdmin, IsAdminOrManager
 from .serializers import (
+    AdminUserSerializer,
     AuditLogSerializer,
     AvailableManagerUserSerializer,
     AvailableTrainerUserSerializer,
@@ -14,6 +16,7 @@ from .serializers import (
     ManagerSerializer,
     PendingUserSerializer,
     RegisterSerializer,
+    UserProfileSerializer,
 )
 
 
@@ -163,6 +166,61 @@ class AvailableManagerUserListView(generics.ListAPIView):
             role="MANAGER",
             is_approved=True,
         ).select_related("manager", "manager__batch").order_by("username")
+
+
+class MyProfileView(APIView):
+    """Any authenticated user can GET/PATCH their own profile."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        serializer = UserProfileSerializer(request.user)
+        return Response(serializer.data)
+
+    def patch(self, request):
+        serializer = UserProfileSerializer(request.user, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+
+class AdminUserListView(generics.ListAPIView):
+    """Admin can list all non-student users with search & role filters."""
+    serializer_class = AdminUserSerializer
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get_queryset(self):
+        qs = User.objects.filter(
+            role__in=["ADMIN", "MANAGER", "TRAINER"]
+        ).select_related(
+            "trainer_profile__batch",
+            "manager__batch",
+        ).order_by("role", "username")
+
+        role = self.request.query_params.get("role", "")
+        if role:
+            qs = qs.filter(role=role.upper())
+
+        search = self.request.query_params.get("search", "").strip()
+        if search:
+            qs = qs.filter(
+                Q(username__icontains=search)
+                | Q(email__icontains=search)
+                | Q(first_name__icontains=search)
+                | Q(last_name__icontains=search)
+            )
+
+        return qs
+
+
+class AdminUserDetailView(generics.RetrieveUpdateAPIView):
+    """Admin can view and update any user's profile fields (email, name)."""
+    serializer_class = AdminUserSerializer
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get_queryset(self):
+        return User.objects.filter(role__in=["ADMIN", "MANAGER", "TRAINER"]).select_related(
+            "trainer_profile__batch", "manager__batch"
+        )
 
 
 class ManagerViewSet(viewsets.ModelViewSet):

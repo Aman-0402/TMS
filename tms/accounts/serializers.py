@@ -1,3 +1,4 @@
+from django.db.models import Q
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
@@ -153,6 +154,107 @@ class AvailableManagerUserSerializer(serializers.ModelSerializer):
     def get_current_batch_name(self, obj):
         manager = self._get_manager_profile(obj)
         return manager.batch.name if manager else ""
+
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    """Used by any authenticated user to view / update their own profile."""
+    current_password = serializers.CharField(write_only=True, required=False, allow_blank=True, default="")
+    new_password = serializers.CharField(write_only=True, required=False, allow_blank=True, min_length=8, default="")
+    confirm_password = serializers.CharField(write_only=True, required=False, allow_blank=True, default="")
+
+    class Meta:
+        model = User
+        fields = (
+            "id", "username", "email", "first_name", "last_name",
+            "role", "is_approved", "date_joined", "last_login",
+            "current_password", "new_password", "confirm_password",
+        )
+        read_only_fields = ("id", "username", "role", "is_approved", "date_joined", "last_login")
+
+    def validate(self, attrs):
+        new_pw  = attrs.get("new_password", "").strip()
+        curr_pw = attrs.get("current_password", "").strip()
+        conf_pw = attrs.get("confirm_password", "").strip()
+
+        if new_pw:
+            if not curr_pw:
+                raise serializers.ValidationError(
+                    {"current_password": "Current password is required to set a new password."}
+                )
+            user = self.instance
+            if not user.check_password(curr_pw):
+                raise serializers.ValidationError(
+                    {"current_password": "Current password is incorrect."}
+                )
+            if new_pw != conf_pw:
+                raise serializers.ValidationError(
+                    {"confirm_password": "New passwords do not match."}
+                )
+
+        return attrs
+
+    def update(self, instance, validated_data):
+        new_pw = validated_data.pop("new_password", "").strip()
+        validated_data.pop("current_password", None)
+        validated_data.pop("confirm_password", None)
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        if new_pw:
+            instance.set_password(new_pw)
+
+        instance.save()
+        return instance
+
+
+class AdminUserSerializer(serializers.ModelSerializer):
+    """Used by Admin to list and update any user's profile."""
+    approval_status = serializers.SerializerMethodField()
+    full_name       = serializers.SerializerMethodField()
+    batch_name      = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = (
+            "id", "username", "first_name", "last_name", "full_name",
+            "email", "role", "is_approved", "is_rejected", "rejection_reason",
+            "approval_status", "batch_name", "date_joined", "last_login",
+        )
+        read_only_fields = (
+            "id", "username", "role", "is_approved", "is_rejected",
+            "rejection_reason", "approval_status", "batch_name",
+            "date_joined", "last_login",
+        )
+
+    def get_approval_status(self, obj):
+        if obj.is_approved:
+            return "APPROVED"
+        if obj.is_rejected:
+            return "REJECTED"
+        return "PENDING"
+
+    def get_full_name(self, obj):
+        return obj.get_full_name() or ""
+
+    def get_batch_name(self, obj):
+        # Trainer
+        try:
+            return obj.trainer_profile.batch.name
+        except Exception:
+            pass
+        # Manager
+        try:
+            return obj.manager.batch.name
+        except Exception:
+            pass
+        return ""
+
+    def update(self, instance, validated_data):
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        return instance
 
 
 class ManagerSerializer(serializers.ModelSerializer):
