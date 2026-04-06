@@ -1,6 +1,7 @@
 import { Route, Routes } from "react-router-dom";
 
 import DashboardLayout from "./layouts/DashboardLayout";
+import AttendancePage from "./pages/AttendancePage";
 import AuditLogsPage from "./pages/AuditLogsPage";
 import BatchesPage from "./pages/BatchesPage";
 import CoursesPage from "./pages/CoursesPage";
@@ -8,16 +9,16 @@ import DashboardPage from "./pages/DashboardPage";
 import LabsPage from "./pages/LabsPage";
 import Login from "./pages/Login";
 import ManagersPage from "./pages/ManagersPage";
-import AttendancePage from "./pages/AttendancePage";
 import ModulePage from "./pages/ModulePage";
-import ResultsPage from "./pages/ResultsPage";
 import NotFoundPage from "./pages/NotFoundPage";
 import ApprovalPage from "./pages/ApprovalPage";
 import RegisterPage from "./pages/RegisterPage";
+import ResultsPage from "./pages/ResultsPage";
 import StudentsPage from "./pages/StudentsPage";
 import StudentsListPage from "./pages/StudentsListPage";
 import StudentUploadPage from "./pages/StudentUploadPage";
 import TrainersPage from "./pages/TrainersPage";
+import TrainerMockResultsPage from "./pages/TrainerMockResultsPage";
 import PrivateRoute from "./routes/PrivateRoute";
 
 function App() {
@@ -35,6 +36,7 @@ function App() {
         }
       >
         <Route index element={<DashboardPage />} />
+
         <Route
           path="audit-logs"
           element={
@@ -43,6 +45,7 @@ function App() {
             </PrivateRoute>
           }
         />
+
         <Route
           path="courses"
           element={
@@ -51,6 +54,7 @@ function App() {
             </PrivateRoute>
           }
         />
+
         <Route
           path="batches"
           element={
@@ -59,14 +63,7 @@ function App() {
             </PrivateRoute>
           }
         />
-        <Route
-          path="create-batch"
-          element={
-            <PrivateRoute allowedRoles={["ADMIN", "MANAGER"]}>
-              <BatchesPage />
-            </PrivateRoute>
-          }
-        />
+
         <Route
           path="students"
           element={
@@ -75,6 +72,7 @@ function App() {
             </PrivateRoute>
           }
         />
+
         <Route
           path="students/list"
           element={
@@ -83,14 +81,16 @@ function App() {
             </PrivateRoute>
           }
         />
+
         <Route
           path="students/upload"
           element={
-            <PrivateRoute allowedRoles={["ADMIN", "MANAGER", "TRAINER"]}>
+            <PrivateRoute allowedRoles={["ADMIN", "MANAGER"]}>
               <StudentUploadPage />
             </PrivateRoute>
           }
         />
+
         <Route
           path="approvals"
           element={
@@ -99,6 +99,7 @@ function App() {
             </PrivateRoute>
           }
         />
+
         <Route
           path="trainers"
           element={
@@ -107,6 +108,7 @@ function App() {
             </PrivateRoute>
           }
         />
+
         <Route
           path="managers"
           element={
@@ -115,6 +117,7 @@ function App() {
             </PrivateRoute>
           }
         />
+
         <Route
           path="labs"
           element={
@@ -123,6 +126,7 @@ function App() {
             </PrivateRoute>
           }
         />
+
         <Route
           path="attendance"
           element={
@@ -131,6 +135,7 @@ function App() {
             </PrivateRoute>
           }
         />
+
         <Route
           path="results"
           element={
@@ -139,6 +144,16 @@ function App() {
             </PrivateRoute>
           }
         />
+
+        <Route
+          path="mock-results"
+          element={
+            <PrivateRoute allowedRoles={["TRAINER"]}>
+              <TrainerMockResultsPage />
+            </PrivateRoute>
+          }
+        />
+
         <Route
           path="exams"
           element={
@@ -148,6 +163,7 @@ function App() {
             />
           }
         />
+
         <Route
           path="certificates"
           element={

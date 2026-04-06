@@ -1,185 +1,250 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   ArcElement,
+  BarElement,
+  CategoryScale,
   Chart as ChartJS,
   Legend,
+  LinearScale,
   Tooltip,
 } from "chart.js";
-import { Doughnut } from "react-chartjs-2";
+import { Bar, Doughnut } from "react-chartjs-2";
 
 import http from "../api/http";
+import { getRole } from "../utils/auth";
 import PageHeader from "../components/common/PageHeader";
 
-ChartJS.register(ArcElement, Tooltip, Legend);
+ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
-function normalizeApiList(responseData) {
-  return Array.isArray(responseData) ? responseData : responseData.results || [];
+function normalizeApiList(data) {
+  return Array.isArray(data) ? data : data?.results || [];
+}
+
+// ── Stat card ──────────────────────────────────────────────────────────────
+function StatCard({ title, value, tone, description, isLoading }) {
+  return (
+    <div className="card h-100 shadow-sm border-0">
+      <div className="card-body">
+        <div className={`text-${tone} text-uppercase small fw-semibold mb-2`}>{title}</div>
+        <div className="display-6 fw-bold mb-2">{isLoading ? "—" : value}</div>
+        <p className="text-secondary small mb-0">{description}</p>
+      </div>
+    </div>
+  );
 }
 
 function DashboardPage() {
+  const role = getRole();
+  const showFull = role === "ADMIN" || role === "MANAGER";
+
   const [students, setStudents] = useState([]);
-  const [batches, setBatches] = useState([]);
-  const [results, setResults] = useState([]);
+  const [batches,  setBatches]  = useState([]);
+  const [results,  setResults]  = useState([]);
+  const [trainers, setTrainers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError]         = useState("");
 
   useEffect(() => {
-    const loadAnalytics = async () => {
-      setError("");
+    const promises = [
+      http.get("students/"),
+      http.get("batches/"),
+      http.get("results/"),
+    ];
+    if (showFull) promises.push(http.get("trainers/"));
 
-      try {
-        const [studentsResponse, batchesResponse, resultsResponse] = await Promise.all([
-          http.get("students/"),
-          http.get("batches/"),
-          http.get("results/"),
-        ]);
+    Promise.all(promises)
+      .then(([sRes, bRes, rRes, tRes]) => {
+        setStudents(normalizeApiList(sRes.data));
+        setBatches(normalizeApiList(bRes.data));
+        setResults(normalizeApiList(rRes.data));
+        if (tRes) setTrainers(normalizeApiList(tRes.data));
+      })
+      .catch(() => setError("Unable to load dashboard data."))
+      .finally(() => setIsLoading(false));
+  }, [showFull]);
 
-        setStudents(normalizeApiList(studentsResponse.data));
-        setBatches(normalizeApiList(batchesResponse.data));
-        setResults(normalizeApiList(resultsResponse.data));
-      } catch (fetchError) {
-        setError("Unable to load dashboard analytics. Please check the backend server.");
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  // ── Pass/Fail ──────────────────────────────────────────────────────────
+  const passCount = useMemo(() => results.filter((r) => r.is_pass).length, [results]);
+  const failCount = useMemo(() => results.filter((r) => !r.is_pass).length, [results]);
+  const eligibleCount = useMemo(() => results.filter((r) => r.is_final_mock_pass).length, [results]);
 
-    loadAnalytics();
-  }, []);
+  const doughnutData = useMemo(() => ({
+    labels: ["Pass", "Fail"],
+    datasets: [{
+      data: [passCount, failCount],
+      backgroundColor: ["#198754", "#dc3545"],
+      borderColor: ["#fff", "#fff"],
+      borderWidth: 2,
+    }],
+  }), [passCount, failCount]);
 
-  const passCount = useMemo(
-    () => results.filter((result) => result.is_pass).length,
-    [results]
-  );
-  const failCount = useMemo(
-    () => results.filter((result) => !result.is_pass).length,
-    [results]
-  );
+  // ── Batch performance ──────────────────────────────────────────────────
+  const batchPerf = useMemo(() => {
+    const map = {};
+    batches.forEach((b) => { map[b.id] = { name: b.name, pass: 0, fail: 0 }; });
+    results.forEach((r) => {
+      if (!map[r.batch]) return;
+      if (r.is_pass) map[r.batch].pass++;
+      else           map[r.batch].fail++;
+    });
+    return Object.values(map)
+      .filter((b) => b.pass + b.fail > 0)
+      .sort((a, b) => b.pass + b.fail - (a.pass + a.fail))
+      .slice(0, 8);
+  }, [batches, results]);
 
-  const chartData = useMemo(
-    () => ({
-      labels: ["Pass", "Fail"],
-      datasets: [
-        {
-          data: [passCount, failCount],
-          backgroundColor: ["#198754", "#dc3545"],
-          borderColor: ["#ffffff", "#ffffff"],
-          borderWidth: 2,
-        },
-      ],
-    }),
-    [passCount, failCount]
-  );
+  const batchBarData = useMemo(() => ({
+    labels: batchPerf.map((b) => b.name),
+    datasets: [
+      { label: "Pass", data: batchPerf.map((b) => b.pass), backgroundColor: "#198754" },
+      { label: "Fail", data: batchPerf.map((b) => b.fail), backgroundColor: "#dc3545" },
+    ],
+  }), [batchPerf]);
 
-  const chartOptions = {
+  const barOptions = {
     responsive: true,
     maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        position: "bottom",
-      },
-    },
+    plugins: { legend: { position: "bottom" } },
+    scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { stepSize: 1 } } },
   };
 
+  // ── Trainer performance ────────────────────────────────────────────────
+  const trainerPerf = useMemo(() => {
+    const studentBatch = {};
+    students.forEach((s) => { studentBatch[s.id] = s.batch; });
+
+    const batchTrainer = {};
+    trainers.forEach((t) => {
+      if (t.batch) batchTrainer[t.batch] = t.name || t.username || `Trainer ${t.id}`;
+    });
+
+    const map = {};
+    results.forEach((r) => {
+      const batchId   = r.batch;
+      const trainerName = batchTrainer[batchId] || `Batch ${batchId}`;
+      if (!map[trainerName]) map[trainerName] = { pass: 0, fail: 0 };
+      if (r.is_pass) map[trainerName].pass++;
+      else           map[trainerName].fail++;
+    });
+    return Object.entries(map)
+      .map(([name, v]) => ({ name, ...v, total: v.pass + v.fail }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 6);
+  }, [results, students, trainers]);
+
   const summaryCards = [
-    {
-      title: "Total Students",
-      value: students.length,
-      tone: "primary",
-      description: "Students currently registered in the system.",
-    },
-    {
-      title: "Total Batches",
-      value: batches.length,
-      tone: "success",
-      description: "Training batches available for management.",
-    },
-    {
-      title: "Pass Count",
-      value: passCount,
-      tone: "info",
-      description: "Students currently marked as passed.",
-    },
-    {
-      title: "Fail Count",
-      value: failCount,
-      tone: "danger",
-      description: "Students currently marked as failed.",
-    },
+    { title: "Total Students",  value: students.length, tone: "primary", description: "Students currently registered." },
+    { title: "Total Batches",   value: batches.length,  tone: "success", description: "Active training batches." },
+    { title: "Final Exam Pass", value: passCount,        tone: "info",    description: "Students who passed the Final Exam." },
+    { title: "Mock Eligible",   value: eligibleCount,   tone: "warning", description: "Students who passed the Final Mock (≥70%)." },
   ];
 
   return (
     <>
       <PageHeader
         title="Dashboard"
-        description="View key analytics for students, batches, and overall result performance."
+        description="Analytics overview — students, batches, results, and trainer performance."
       />
 
-      {error ? (
-        <div className="alert alert-danger" role="alert">
-          {error}
-        </div>
-      ) : null}
+      {error && <div className="alert alert-danger">{error}</div>}
 
+      {/* Stat cards */}
       <div className="row g-4 mb-4">
         {summaryCards.map((card) => (
           <div className="col-md-6 col-xl-3" key={card.title}>
-            <div className="card h-100 shadow-sm border-0">
-              <div className="card-body">
-                <div className={`text-${card.tone} text-uppercase small fw-semibold mb-2`}>
-                  {card.title}
-                </div>
-                <div className="display-6 fw-bold mb-2">
-                  {isLoading ? "-" : card.value}
-                </div>
-                <p className="text-secondary mb-0">{card.description}</p>
-              </div>
-            </div>
+            <StatCard {...card} isLoading={isLoading} />
           </div>
         ))}
       </div>
 
-      <div className="row g-4">
-        <div className="col-lg-8">
+      <div className="row g-4 mb-4">
+        {/* Pass vs Fail donut */}
+        <div className="col-lg-4">
           <div className="card shadow-sm border-0 h-100">
             <div className="card-body">
-              <h2 className="h5 mb-3">Overview</h2>
-              <p className="text-secondary mb-4">
-                This dashboard gives a quick snapshot of student volume, batch count,
-                and outcome distribution across available results.
-              </p>
-
-              <div className="row g-3">
-                <div className="col-md-6">
-                  <div className="p-3 rounded bg-light border h-100">
-                    <div className="text-muted small mb-2">Students</div>
-                    <div className="h3 mb-1">{isLoading ? "-" : students.length}</div>
-                    <div className="text-secondary small">Active learner records in TMS.</div>
-                  </div>
+              <h2 className="h5 mb-3">Final Exam — Pass vs Fail</h2>
+              {isLoading ? <p className="text-secondary">Loading…</p> : (
+                <div style={{ height: 280 }}>
+                  <Doughnut data={doughnutData} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "bottom" } } }} />
                 </div>
-                <div className="col-md-6">
-                  <div className="p-3 rounded bg-light border h-100">
-                    <div className="text-muted small mb-2">Batches</div>
-                    <div className="h3 mb-1">{isLoading ? "-" : batches.length}</div>
-                    <div className="text-secondary small">Training groups currently tracked.</div>
-                  </div>
-                </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
 
-        <div className="col-lg-4">
+        {/* Batch performance bar */}
+        <div className="col-lg-8">
           <div className="card shadow-sm border-0 h-100">
             <div className="card-body">
-              <h2 className="h5 mb-3">Pass vs Fail</h2>
-              <div style={{ height: "320px" }}>
-                <Doughnut data={chartData} options={chartOptions} />
-              </div>
+              <h2 className="h5 mb-3">Batch Performance</h2>
+              {isLoading ? <p className="text-secondary">Loading…</p> : batchPerf.length === 0 ? (
+                <p className="text-secondary small">No result data yet.</p>
+              ) : (
+                <div style={{ height: 280 }}>
+                  <Bar data={batchBarData} options={barOptions} />
+                </div>
+              )}
             </div>
           </div>
         </div>
       </div>
+
+      {/* Trainer performance table (Admin/Manager only) */}
+      {showFull && (
+        <div className="row g-4">
+          <div className="col-12">
+            <div className="card shadow-sm border-0">
+              <div className="card-body">
+                <h2 className="h5 mb-3">Trainer / Batch Performance</h2>
+                {isLoading ? <p className="text-secondary">Loading…</p> : trainerPerf.length === 0 ? (
+                  <p className="text-secondary small">No trainer result data yet.</p>
+                ) : (
+                  <div className="table-responsive">
+                    <table className="table table-hover align-middle mb-0">
+                      <thead className="table-light">
+                        <tr>
+                          <th>Trainer / Batch</th>
+                          <th>Total Students</th>
+                          <th>Pass</th>
+                          <th>Fail</th>
+                          <th>Pass Rate</th>
+                          <th style={{ width: 200 }}>Progress</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {trainerPerf.map((t) => {
+                          const rate = t.total > 0 ? Math.round((t.pass / t.total) * 100) : 0;
+                          return (
+                            <tr key={t.name}>
+                              <td className="fw-medium">{t.name}</td>
+                              <td>{t.total}</td>
+                              <td className="text-success fw-semibold">{t.pass}</td>
+                              <td className="text-danger fw-semibold">{t.fail}</td>
+                              <td>
+                                <span className={`badge bg-${rate >= 70 ? "success" : rate >= 40 ? "warning text-dark" : "danger"}`}>
+                                  {rate}%
+                                </span>
+                              </td>
+                              <td>
+                                <div className="progress" style={{ height: 8 }}>
+                                  <div
+                                    className={`progress-bar bg-${rate >= 70 ? "success" : rate >= 40 ? "warning" : "danger"}`}
+                                    style={{ width: `${rate}%` }}
+                                  />
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

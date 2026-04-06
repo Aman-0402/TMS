@@ -43,10 +43,19 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 
 class PendingUserSerializer(serializers.ModelSerializer):
+    approval_status = serializers.SerializerMethodField()
+
     class Meta:
         model = User
-        fields = ("id", "username", "email", "role", "is_approved")
+        fields = ("id", "username", "email", "role", "is_approved", "is_rejected", "rejection_reason", "approval_status")
         read_only_fields = fields
+
+    def get_approval_status(self, obj):
+        if obj.is_approved:
+            return "APPROVED"
+        if obj.is_rejected:
+            return "REJECTED"
+        return "PENDING"
 
 
 class AuditLogSerializer(serializers.ModelSerializer):

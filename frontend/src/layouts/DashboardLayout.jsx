@@ -8,7 +8,6 @@ const pageTitles = {
   "/audit-logs": "Audit Logs",
   "/courses": "Courses",
   "/batches": "Batches",
-  "/create-batch": "Create Batch",
   "/labs": "Labs",
   "/students": "Students",
   "/students/list": "Student Directory",
@@ -17,7 +16,7 @@ const pageTitles = {
   "/managers": "Managers",
   "/attendance": "Attendance",
   "/results": "Results",
-  "/results/final-exam": "Final Exam List",
+  "/mock-results": "Mock Results",
   "/approvals": "Approvals",
 };
 
@@ -26,46 +25,56 @@ function DashboardLayout() {
   const { logout, user } = useAuth();
   const role = getRole();
   const pageTitle = pageTitles[location.pathname] || "TMS";
+
   const navigationItems = [
     { to: "/", label: "Dashboard", end: true },
+
+    // ── ADMIN ──────────────────────────────────────────────────────────────
     ...(role === "ADMIN" ? [{ to: "/audit-logs", label: "Audit Logs" }] : []),
-    ...((role === "ADMIN" || role === "MANAGER")
+
+    ...(role === "ADMIN" || role === "MANAGER"
       ? [
-          { to: "/courses", label: "Courses" },
-          { to: "/create-batch", label: "Create Batch" },
-          { to: "/batches", label: "Batches" },
-          { to: "/labs", label: "Labs" },
+          { to: "/courses",  label: "Courses"  },
+          { to: "/batches",  label: "Batches"  },
+          { to: "/labs",     label: "Labs"     },
         ]
       : []),
+
     ...(role === "ADMIN"
       ? [
-          { to: "/managers", label: "Managers" },
-          { to: "/trainers", label: "Trainers" },
-          { to: "/students", label: "Students" },
-          { to: "/students/list", label: "Student Directory" },
-          { to: "/students/upload", label: "Student Upload" },
+          { to: "/managers",        label: "Managers"         },
+          { to: "/trainers",        label: "Trainers"         },
+          { to: "/students",        label: "Students"         },
+          { to: "/students/list",   label: "Student Directory"},
+          { to: "/students/upload", label: "Student Upload"   },
+          { to: "/attendance",      label: "Attendance"       },
+          { to: "/results",         label: "Results"          },
+          { to: "/approvals",       label: "Approvals"        },
         ]
       : []),
+
+    // ── MANAGER ────────────────────────────────────────────────────────────
     ...(role === "MANAGER"
       ? [
-          { to: "/trainers", label: "Trainers" },
-          { to: "/students", label: "Students" },
-          { to: "/students/list", label: "Student Directory" },
-          { to: "/students/upload", label: "Student Upload" },
-          { to: "/attendance", label: "Attendance" },
-          { to: "/results", label: "Results" },
+          { to: "/trainers",        label: "Trainers"         },
+          { to: "/students",        label: "Students"         },
+          { to: "/students/list",   label: "Student Directory"},
+          { to: "/students/upload", label: "Student Upload"   },
+          { to: "/attendance",      label: "Attendance"       },
+          { to: "/results",         label: "Results"          },
+          { to: "/approvals",       label: "Approvals"        },
         ]
       : []),
+
+    // ── TRAINER ────────────────────────────────────────────────────────────
     ...(role === "TRAINER"
       ? [
-          { to: "/students/list", label: "Student Directory" },
-          { to: "/students/upload", label: "Student Upload" },
-          { to: "/attendance", label: "Attendance" },
-          { to: "/results", label: "Results" },
+          { to: "/students/list",  label: "Student Directory" },
+          { to: "/attendance",     label: "Attendance"        },
+          { to: "/mock-results",   label: "Mock Results"      },
+          { to: "/results",        label: "Results"           },
         ]
       : []),
-    ...(role === "ADMIN" ? [{ to: "/results", label: "Results" }, { to: "/approvals", label: "Approvals" }] : []),
-    ...(role === "MANAGER" ? [{ to: "/approvals", label: "Approvals" }] : []),
   ];
 
   const handleLogout = () => {

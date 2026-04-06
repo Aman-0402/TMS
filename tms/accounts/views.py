@@ -25,6 +25,11 @@ class CustomLoginView(TokenObtainPairView):
         user = User.objects.filter(username=username).first()
 
         if user and not user.is_approved:
+            if user.is_rejected:
+                return Response(
+                    {"error": f"Account rejected. Reason: {user.rejection_reason or 'No reason provided.'}"},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
             return Response(
                 {"error": "Account not approved yet"},
                 status=status.HTTP_403_FORBIDDEN,
@@ -57,33 +62,75 @@ class PendingUserListView(generics.ListAPIView):
         if user.role == "ADMIN":
             allowed_roles = ["MANAGER", "TRAINER"]
         elif user.role == "MANAGER":
-            allowed_roles = ["STUDENT"]
+            allowed_roles = ["TRAINER", "STUDENT"]
         else:
             raise PermissionDenied("You do not have permission to view pending approvals.")
 
-        return User.objects.filter(is_approved=False, role__in=allowed_roles).order_by("username")
+        # Status filter: pending / approved / rejected / all (default=pending)
+        filter_status = self.request.query_params.get("status", "pending").lower()
+        role_filter = self.request.query_params.get("role", "")
+
+        qs = User.objects.filter(role__in=allowed_roles).order_by("role", "username")
+
+        if role_filter and role_filter.upper() in allowed_roles:
+            qs = qs.filter(role=role_filter.upper())
+
+        if filter_status == "approved":
+            qs = qs.filter(is_approved=True)
+        elif filter_status == "rejected":
+            qs = qs.filter(is_rejected=True, is_approved=False)
+        elif filter_status == "all":
+            pass
+        else:
+            # default: pending (not approved, not rejected)
+            qs = qs.filter(is_approved=False, is_rejected=False)
+
+        return qs
 
 
 class ApproveUserView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, pk, *args, **kwargs):
-        target_user = User.objects.filter(pk=pk, is_approved=False).first()
+        target_user = User.objects.filter(pk=pk).first()
 
         if not target_user:
-            return Response(
-                {"error": "Pending user not found"},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
 
         if request.user.role not in {"ADMIN", "MANAGER"} or not request.user.can_approve(target_user):
             raise PermissionDenied("You do not have permission to approve this user.")
 
         target_user.is_approved = True
-        target_user.save(update_fields=["is_approved"])
+        target_user.is_rejected = False
+        target_user.rejection_reason = ""
+        target_user.save(update_fields=["is_approved", "is_rejected", "rejection_reason"])
 
         return Response(
             {"message": f"{target_user.username} approved successfully"},
+            status=status.HTTP_200_OK,
+        )
+
+
+class RejectUserView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk, *args, **kwargs):
+        target_user = User.objects.filter(pk=pk).first()
+
+        if not target_user:
+            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        if request.user.role not in {"ADMIN", "MANAGER"} or not request.user.can_approve(target_user):
+            raise PermissionDenied("You do not have permission to reject this user.")
+
+        reason = request.data.get("reason", "").strip()
+        target_user.is_approved = False
+        target_user.is_rejected = True
+        target_user.rejection_reason = reason
+        target_user.save(update_fields=["is_approved", "is_rejected", "rejection_reason"])
+
+        return Response(
+            {"message": f"{target_user.username} rejected successfully"},
             status=status.HTTP_200_OK,
         )
 

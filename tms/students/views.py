@@ -184,12 +184,20 @@ class StudentViewSet(SoftDeleteMixin, AuditLogMixin, RoleScopedQuerysetMixin, vi
             str(lab.name).strip(): lab
             for lab in Lab.objects.select_related("trainer", "trainer__user").filter(batch=batch)
         }
-        existing_ug_numbers = set(
-            Student.objects.filter(ug_number__in=normalized_ug_numbers).values_list("ug_number", flat=True)
-        )
+
+        # Map existing students by UG number, including their current course
+        existing_students = {
+            s.ug_number: s
+            for s in Student.objects.select_related("batch__course").filter(
+                ug_number__in=normalized_ug_numbers
+            )
+        }
+
         students_to_create = []
+        students_to_reenroll = []   # (student_instance, new_batch, new_lab, new_name, new_dept, new_email, new_phone)
         created_ug_numbers = []
-        skipped_duplicates = 0
+        same_course_duplicates = []
+        processed_in_file = set()
 
         with transaction.atomic():
             for row_number, row in enumerate(dataframe.iterrows(), start=2):
@@ -207,6 +215,10 @@ class StudentViewSet(SoftDeleteMixin, AuditLogMixin, RoleScopedQuerysetMixin, vi
                         status=status.HTTP_400_BAD_REQUEST,
                     )
 
+                if ug_number in processed_in_file:
+                    continue
+                processed_in_file.add(ug_number)
+
                 lab = labs_by_name.get(lab_name)
                 if not lab:
                     lab = self._get_or_create_upload_lab(batch, lab_name, labs_by_name)
@@ -219,8 +231,18 @@ class StudentViewSet(SoftDeleteMixin, AuditLogMixin, RoleScopedQuerysetMixin, vi
 
                 self._validate_lab_upload_scope(lab)
 
-                if ug_number in existing_ug_numbers:
-                    skipped_duplicates += 1
+                existing = existing_students.get(ug_number)
+                if existing:
+                    # Same course → duplicate, skip
+                    if existing.batch.course_id == batch.course_id:
+                        same_course_duplicates.append({
+                            "ug_number": ug_number,
+                            "name": existing.name,
+                            "current_batch": existing.batch.name,
+                        })
+                    else:
+                        # Different course → re-enroll (move to new batch/lab)
+                        students_to_reenroll.append((existing, batch, lab, name, department, email, phone))
                     continue
 
                 students_to_create.append(
@@ -235,32 +257,61 @@ class StudentViewSet(SoftDeleteMixin, AuditLogMixin, RoleScopedQuerysetMixin, vi
                     )
                 )
                 created_ug_numbers.append(ug_number)
-                existing_ug_numbers.add(ug_number)
 
+            # Bulk-create new students
             Student.objects.bulk_create(students_to_create, batch_size=1000)
 
+            # Re-enroll existing students
+            reenrolled_ids = []
+            for student, new_batch, new_lab, new_name, new_dept, new_email, new_phone in students_to_reenroll:
+                student.batch = new_batch
+                student.lab   = new_lab
+                student.name  = new_name or student.name
+                student.department = new_dept or student.department
+                student.email = new_email or student.email
+                student.phone = new_phone or student.phone
+                student.is_deleted = False
+                student.deleted_at = None
+                student.save()
+                reenrolled_ids.append(student.pk)
+
+            # Audit log for new creates
             created_students = list(
                 Student.objects.filter(ug_number__in=created_ug_numbers).select_related("batch")
             )
-            AuditLog.objects.bulk_create(
-                [
+            audit_logs = [
+                AuditLog(
+                    user=request.user,
+                    action=AuditLog.Action.CREATE,
+                    model_name="Student",
+                    object_id=student.pk,
+                    description=f"Created Student via Excel upload: {student}",
+                )
+                for student in created_students
+            ]
+            # Audit log for re-enrollments
+            for pk in reenrolled_ids:
+                audit_logs.append(
                     AuditLog(
                         user=request.user,
-                        action=AuditLog.Action.CREATE,
+                        action=AuditLog.Action.UPDATE,
                         model_name="Student",
-                        object_id=student.pk,
-                        description=f"Created Student via Excel upload: {student}",
+                        object_id=pk,
+                        description=f"Re-enrolled Student (different course) via Excel upload",
                     )
-                    for student in created_students
-                ],
-                batch_size=1000,
-            )
+                )
+            AuditLog.objects.bulk_create(audit_logs, batch_size=1000)
 
         return Response(
             {
-                "message": f"{len(students_to_create)} students uploaded successfully",
+                "message": (
+                    f"{len(students_to_create)} student(s) created, "
+                    f"{len(students_to_reenroll)} re-enrolled, "
+                    f"{len(same_course_duplicates)} same-course duplicate(s) skipped."
+                ),
                 "created_count": len(students_to_create),
-                "skipped_duplicates": skipped_duplicates,
+                "reenrolled_count": len(students_to_reenroll),
+                "same_course_duplicates": same_course_duplicates,
             },
             status=status.HTTP_201_CREATED,
         )

@@ -21,6 +21,11 @@ class User(AbstractUser):
         default=False,
         help_text="Determines whether the user can log in to TMS.",
     )
+    is_rejected = models.BooleanField(
+        default=False,
+        help_text="Set when an approver rejects this account.",
+    )
+    rejection_reason = models.TextField(blank=True, default="")
 
     def save(self, *args, **kwargs):
         # Bootstrap superusers should never be blocked by the approval gate.
@@ -31,10 +36,8 @@ class User(AbstractUser):
     def can_approve(self, target_user) -> bool:
         if self.role == "ADMIN":
             return target_user.role in {"MANAGER", "TRAINER"}
-
-        if self.role in {"MANAGER", "TRAINER"}:
-            return target_user.role == "STUDENT"
-
+        if self.role == "MANAGER":
+            return target_user.role in {"TRAINER", "STUDENT"}
         return False
 
     def __str__(self) -> str:

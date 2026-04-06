@@ -42,4 +42,16 @@ class BatchSerializer(serializers.ModelSerializer):
                 {"end_date": "End date must be greater than or equal to start date."}
             )
 
+        # Prevent duplicate: same name + same course (excluding the current instance on update)
+        name = attrs.get("name", getattr(self.instance, "name", None))
+        course = attrs.get("course", getattr(self.instance, "course", None))
+        if name and course:
+            qs = Batch.objects.filter(name__iexact=name.strip(), course=course, is_deleted=False)
+            if self.instance:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise serializers.ValidationError(
+                    {"name": f"A batch named '{name}' already exists for this course."}
+                )
+
         return attrs
