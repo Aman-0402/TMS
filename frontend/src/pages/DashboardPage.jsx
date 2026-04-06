@@ -68,18 +68,18 @@ function DashboardPage() {
 
   // ── Pass/Fail ──────────────────────────────────────────────────────────
   const passCount = useMemo(() => results.filter((r) => r.is_pass).length, [results]);
-  const failCount = useMemo(() => results.filter((r) => !r.is_pass).length, [results]);
-  const eligibleCount = useMemo(() => results.filter((r) => r.is_final_mock_pass).length, [results]);
+  const failCount = useMemo(() => results.filter((r) => !r.is_pass && r.final_exam > 0).length, [results]);
+  const absentCount = useMemo(() => results.filter((r) => r.final_exam === 0 || r.final_exam === null).length, [results]);
 
   const doughnutData = useMemo(() => ({
-    labels: ["Pass", "Fail"],
+    labels: ["Pass", "Fail", "Absent"],
     datasets: [{
-      data: [passCount, failCount],
-      backgroundColor: ["#198754", "#dc3545"],
-      borderColor: ["#fff", "#fff"],
+      data: [passCount, failCount, absentCount],
+      backgroundColor: ["#198754", "#dc3545", "#0dcaf0"],
+      borderColor: ["#fff", "#fff", "#fff"],
       borderWidth: 2,
     }],
-  }), [passCount, failCount]);
+  }), [passCount, failCount, absentCount]);
 
   // ── Batch performance ──────────────────────────────────────────────────
   const batchPerf = useMemo(() => {
@@ -113,13 +113,10 @@ function DashboardPage() {
 
   // ── Trainer performance ────────────────────────────────────────────────
   const trainerPerf = useMemo(() => {
-    const studentLab = {};
-    students.forEach((s) => { studentLab[s.id] = s.lab; });
-
     const labTrainer = {};
     labs.forEach((l) => {
       if (l.trainer) {
-        labTrainer[l.id] = l.trainer_name || `Lab ${l.name}`;
+        labTrainer[l.id] = l.trainer_name || `Trainer ${l.id}`;
       }
     });
 
@@ -127,13 +124,16 @@ function DashboardPage() {
     results.forEach((r) => {
       const student = students.find((s) => s.id === r.student);
       if (!student) return;
-      
+
       const labId = student.lab;
-      const trainerName = labTrainer[labId] || `Lab ${labId || 'Unassigned'}`;
-      
-      if (!map[trainerName]) map[trainerName] = { pass: 0, fail: 0 };
-      if (r.is_pass) map[trainerName].pass++;
-      else           map[trainerName].fail++;
+      const trainerName = labTrainer[labId];
+
+      // Only include if trainer exists (skip "Lab X" entries)
+      if (trainerName) {
+        if (!map[trainerName]) map[trainerName] = { pass: 0, fail: 0 };
+        if (r.is_pass) map[trainerName].pass++;
+        else           map[trainerName].fail++;
+      }
     });
     return Object.entries(map)
       .map(([name, v]) => ({ name, ...v, total: v.pass + v.fail }))
@@ -145,7 +145,7 @@ function DashboardPage() {
     { title: "Total Students",  value: students.length, tone: "primary", description: "Students currently registered." },
     { title: "Total Batches",   value: batches.length,  tone: "success", description: "Active training batches." },
     { title: "Final Exam Pass", value: passCount,        tone: "info",    description: "Students who passed the Final Exam." },
-    { title: "Mock Eligible",   value: eligibleCount,   tone: "warning", description: "Students who passed the Final Mock (≥70%)." },
+    { title: "Mock Eligible",   value: useMemo(() => results.filter((r) => r.is_final_mock_pass).length, [results]),   tone: "warning", description: "Students who passed the Final Mock (≥70%)." },
   ];
 
   return (
@@ -212,6 +212,7 @@ function DashboardPage() {
                     <table className="table table-hover align-middle mb-0">
                       <thead className="table-light">
                         <tr>
+                          <th style={{ width: "50px" }}>S. No</th>
                           <th>Trainer / Batch</th>
                           <th>Total Students</th>
                           <th>Pass</th>
@@ -221,10 +222,11 @@ function DashboardPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {trainerPerf.map((t) => {
+                        {trainerPerf.map((t, idx) => {
                           const rate = t.total > 0 ? Math.round((t.pass / t.total) * 100) : 0;
                           return (
                             <tr key={t.name}>
+                              <td className="text-muted fw-semibold">{idx + 1}</td>
                               <td className="fw-medium">{t.name}</td>
                               <td>{t.total}</td>
                               <td className="text-success fw-semibold">{t.pass}</td>
