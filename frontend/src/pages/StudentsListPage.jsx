@@ -10,23 +10,29 @@ function normalizeApiList(responseData) {
 function StudentsListPage() {
   const [students, setStudents] = useState([]);
   const [batches, setBatches] = useState([]);
+  const [labs, setLabs] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedBatch, setSelectedBatch] = useState("");
+  const [selectedLab, setSelectedLab] = useState("");
+  const [sortField, setSortField] = useState("name");
+  const [sortDirection, setSortDirection] = useState("asc");
 
   useEffect(() => {
     const loadData = async () => {
       setError("");
 
       try {
-        const [studentsResponse, batchesResponse] = await Promise.all([
+        const [studentsResponse, batchesResponse, labsResponse] = await Promise.all([
           http.get("students/"),
           http.get("batches/"),
+          http.get("labs/"),
         ]);
 
         setStudents(normalizeApiList(studentsResponse.data));
         setBatches(normalizeApiList(batchesResponse.data));
+        setLabs(normalizeApiList(labsResponse.data));
       } catch (requestError) {
         setError("Unable to load students. Please try again.");
       } finally {
@@ -40,9 +46,11 @@ function StudentsListPage() {
   const filteredStudents = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
 
-    return students.filter((student) => {
+    let filtered = students.filter((student) => {
       const matchesBatch =
         !selectedBatch || String(student.batch) === selectedBatch;
+      const matchesLab =
+        !selectedLab || String(student.lab) === selectedLab;
       const matchesSearch =
         !normalizedSearch ||
         student.ug_number?.toLowerCase().includes(normalizedSearch) ||
@@ -51,9 +59,47 @@ function StudentsListPage() {
         student.batch_name?.toLowerCase().includes(normalizedSearch) ||
         student.lab_name?.toLowerCase().includes(normalizedSearch);
 
-      return matchesBatch && matchesSearch;
+      return matchesBatch && matchesLab && matchesSearch;
     });
-  }, [searchTerm, selectedBatch, students]);
+
+    // Sort the filtered results
+    filtered.sort((a, b) => {
+      let aValue = a[sortField] || "";
+      let bValue = b[sortField] || "";
+
+      // Handle special cases for sorting
+      if (sortField === "batch_name") {
+        aValue = a.batch_name || "";
+        bValue = b.batch_name || "";
+      } else if (sortField === "lab_name") {
+        aValue = a.lab_name || "";
+        bValue = b.lab_name || "";
+      }
+
+      // Convert to lowercase for case-insensitive sorting
+      aValue = String(aValue).toLowerCase();
+      bValue = String(bValue).toLowerCase();
+
+      if (sortDirection === "asc") {
+        return aValue.localeCompare(bValue);
+      } else {
+        return bValue.localeCompare(aValue);
+      }
+    });
+
+    return filtered;
+  }, [searchTerm, selectedBatch, selectedLab, sortField, sortDirection, students]);
+
+  const handleSort = (field) => {
+    if (sortField === field) {
+      // Toggle direction if same field
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      // New field, default to ascending
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
 
   return (
     <>
@@ -65,7 +111,7 @@ function StudentsListPage() {
       <div className="card shadow-sm border-0">
         <div className="card-body">
           <div className="row g-3 align-items-end mb-4">
-            <div className="col-md-7">
+            <div className="col-md-4">
               <label className="form-label fw-semibold" htmlFor="student-search">
                 Search Students
               </label>
@@ -79,7 +125,7 @@ function StudentsListPage() {
               />
             </div>
 
-            <div className="col-md-5">
+            <div className="col-md-3">
               <label className="form-label fw-semibold" htmlFor="student-batch-filter">
                 Filter by Batch
               </label>
@@ -95,6 +141,52 @@ function StudentsListPage() {
                     {batch.name}
                   </option>
                 ))}
+              </select>
+            </div>
+
+            <div className="col-md-3">
+              <label className="form-label fw-semibold" htmlFor="student-lab-filter">
+                Filter by Lab
+              </label>
+              <select
+                id="student-lab-filter"
+                className="form-select"
+                value={selectedLab}
+                onChange={(event) => setSelectedLab(event.target.value)}
+              >
+                <option value="">All labs</option>
+                {labs.map((lab) => (
+                  <option key={lab.id} value={lab.id}>
+                    {lab.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="col-md-2">
+              <label className="form-label fw-semibold" htmlFor="student-sort">
+                Sort by
+              </label>
+              <select
+                id="student-sort"
+                className="form-select"
+                value={`${sortField}-${sortDirection}`}
+                onChange={(event) => {
+                  const [field, direction] = event.target.value.split('-');
+                  setSortField(field);
+                  setSortDirection(direction);
+                }}
+              >
+                <option value="name-asc">Name ↑</option>
+                <option value="name-desc">Name ↓</option>
+                <option value="ug_number-asc">UG Number ↑</option>
+                <option value="ug_number-desc">UG Number ↓</option>
+                <option value="department-asc">Department ↑</option>
+                <option value="department-desc">Department ↓</option>
+                <option value="batch_name-asc">Batch ↑</option>
+                <option value="batch_name-desc">Batch ↓</option>
+                <option value="lab_name-asc">Lab ↑</option>
+                <option value="lab_name-desc">Lab ↓</option>
               </select>
             </div>
           </div>
@@ -131,13 +223,23 @@ function StudentsListPage() {
                 <table className="table table-hover align-middle mb-0">
                   <thead className="table-light">
                     <tr>
-                      <th scope="col">UG Number</th>
-                      <th scope="col">Name</th>
-                      <th scope="col">Department</th>
+                      <th scope="col" className="sortable" onClick={() => handleSort('ug_number')} style={{ cursor: 'pointer' }}>
+                        UG Number {sortField === 'ug_number' && (sortDirection === 'asc' ? '↑' : '↓')}
+                      </th>
+                      <th scope="col" className="sortable" onClick={() => handleSort('name')} style={{ cursor: 'pointer' }}>
+                        Name {sortField === 'name' && (sortDirection === 'asc' ? '↑' : '↓')}
+                      </th>
+                      <th scope="col" className="sortable" onClick={() => handleSort('department')} style={{ cursor: 'pointer' }}>
+                        Department {sortField === 'department' && (sortDirection === 'asc' ? '↑' : '↓')}
+                      </th>
                       <th scope="col">Email</th>
                       <th scope="col">Phone</th>
-                      <th scope="col">Batch</th>
-                      <th scope="col">Lab</th>
+                      <th scope="col" className="sortable" onClick={() => handleSort('batch_name')} style={{ cursor: 'pointer' }}>
+                        Batch {sortField === 'batch_name' && (sortDirection === 'asc' ? '↑' : '↓')}
+                      </th>
+                      <th scope="col" className="sortable" onClick={() => handleSort('lab_name')} style={{ cursor: 'pointer' }}>
+                        Lab {sortField === 'lab_name' && (sortDirection === 'asc' ? '↑' : '↓')}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
