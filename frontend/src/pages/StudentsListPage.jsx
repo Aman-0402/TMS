@@ -43,6 +43,15 @@ function StudentsListPage() {
     loadData();
   }, []);
 
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
+
   const filteredStudents = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
 
@@ -212,12 +221,20 @@ function StudentsListPage() {
                   <thead className="table-light">
                     <tr>
                       <th scope="col">UG Number</th>
-                      <th scope="col">Name</th>
-                      <th scope="col">Department</th>
+                      <th scope="col" style={{ cursor: "pointer" }} onClick={() => handleSort("name")}>
+                        Name {sortField === "name" && (sortDirection === "asc" ? "↑" : "↓")}
+                      </th>
+                      <th scope="col" style={{ cursor: "pointer" }} onClick={() => handleSort("department")}>
+                        Department {sortField === "department" && (sortDirection === "asc" ? "↑" : "↓")}
+                      </th>
                       <th scope="col">Email</th>
                       <th scope="col">Phone</th>
-                      <th scope="col">Batch</th>
-                      <th scope="col">Lab</th>
+                      <th scope="col" style={{ cursor: "pointer" }} onClick={() => handleSort("batch_name")}>
+                        Batch {sortField === "batch_name" && (sortDirection === "asc" ? "↑" : "↓")}
+                      </th>
+                      <th scope="col" style={{ cursor: "pointer" }} onClick={() => handleSort("lab_name")}>
+                        Lab {sortField === "lab_name" && (sortDirection === "asc" ? "↑" : "↓")}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
