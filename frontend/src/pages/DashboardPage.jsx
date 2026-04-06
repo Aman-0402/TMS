@@ -39,25 +39,33 @@ function DashboardPage() {
 
   const [students, setStudents] = useState([]);
   const [batches,  setBatches]  = useState([]);
+  const [courses,  setCourses]  = useState([]);
   const [results,  setResults]  = useState([]);
   const [trainers, setTrainers] = useState([]);
   const [labs,     setLabs]     = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError]         = useState("");
 
+  // Filters
+  const [selectedBatch, setSelectedBatch] = useState("");
+  const [selectedCourse, setSelectedCourse] = useState("");
+  const [selectedTrainer, setSelectedTrainer] = useState("");
+
   useEffect(() => {
     const promises = [
       http.get("students/"),
       http.get("batches/"),
+      http.get("courses/"),
       http.get("results/"),
       http.get("labs/"),
     ];
     if (showFull) promises.push(http.get("trainers/"));
 
     Promise.all(promises)
-      .then(([sRes, bRes, rRes, lRes, tRes]) => {
+      .then(([sRes, bRes, cRes, rRes, lRes, tRes]) => {
         setStudents(normalizeApiList(sRes.data));
         setBatches(normalizeApiList(bRes.data));
+        setCourses(normalizeApiList(cRes.data));
         setResults(normalizeApiList(rRes.data));
         setLabs(normalizeApiList(lRes.data));
         if (tRes) setTrainers(normalizeApiList(tRes.data));
@@ -66,10 +74,34 @@ function DashboardPage() {
       .finally(() => setIsLoading(false));
   }, [showFull]);
 
+  // ── Filter calculations ────────────────────────────────────────────────────
+  const filteredResults = useMemo(() => {
+    return results.filter((r) => {
+      // Filter by batch
+      if (selectedBatch && String(r.batch) !== selectedBatch) return false;
+
+      // Filter by course
+      if (selectedCourse) {
+        const batchData = batches.find((b) => b.id === r.batch);
+        if (!batchData || String(batchData.course) !== selectedCourse) return false;
+      }
+
+      // Filter by trainer
+      if (selectedTrainer) {
+        const student = students.find((s) => s.id === r.student);
+        if (!student) return false;
+        const labData = labs.find((l) => l.id === student.lab);
+        if (!labData || !labData.trainer || String(labData.trainer) !== selectedTrainer) return false;
+      }
+
+      return true;
+    });
+  }, [results, selectedBatch, selectedCourse, selectedTrainer, batches, students, labs]);
+
   // ── Pass/Fail ──────────────────────────────────────────────────────────
-  const passCount = useMemo(() => results.filter((r) => r.is_pass).length, [results]);
-  const failCount = useMemo(() => results.filter((r) => !r.is_pass && r.final_exam > 0).length, [results]);
-  const absentCount = useMemo(() => results.filter((r) => r.final_exam === 0 || r.final_exam === null).length, [results]);
+  const passCount = useMemo(() => filteredResults.filter((r) => r.is_pass).length, [filteredResults]);
+  const failCount = useMemo(() => filteredResults.filter((r) => !r.is_pass && r.final_exam > 0).length, [filteredResults]);
+  const absentCount = useMemo(() => filteredResults.filter((r) => r.final_exam === 0 || r.final_exam === null).length, [filteredResults]);
 
   const doughnutData = useMemo(() => ({
     labels: ["Pass", "Fail", "Absent"],
@@ -84,8 +116,12 @@ function DashboardPage() {
   // ── Batch performance ──────────────────────────────────────────────────
   const batchPerf = useMemo(() => {
     const map = {};
-    batches.forEach((b) => { map[b.id] = { name: b.name, pass: 0, fail: 0 }; });
-    results.forEach((r) => {
+    batches.forEach((b) => {
+      // Filter batches by selected course
+      if (selectedCourse && String(b.course) !== selectedCourse) return;
+      map[b.id] = { name: b.name, pass: 0, fail: 0 };
+    });
+    filteredResults.forEach((r) => {
       if (!map[r.batch]) return;
       if (r.is_pass) map[r.batch].pass++;
       else           map[r.batch].fail++;
@@ -94,7 +130,7 @@ function DashboardPage() {
       .filter((b) => b.pass + b.fail > 0)
       .sort((a, b) => b.pass + b.fail - (a.pass + a.fail))
       .slice(0, 8);
-  }, [batches, results]);
+  }, [batches, filteredResults, selectedCourse]);
 
   const batchBarData = useMemo(() => ({
     labels: batchPerf.map((b) => b.name),
@@ -116,36 +152,38 @@ function DashboardPage() {
     const labTrainer = {};
     labs.forEach((l) => {
       if (l.trainer) {
-        labTrainer[l.id] = l.trainer_name || `Trainer ${l.id}`;
+        labTrainer[l.id] = { trainer_id: l.trainer, name: l.trainer_name || `Trainer ${l.id}` };
       }
     });
 
     const map = {};
-    results.forEach((r) => {
+    filteredResults.forEach((r) => {
       const student = students.find((s) => s.id === r.student);
       if (!student) return;
 
       const labId = student.lab;
-      const trainerName = labTrainer[labId];
+      const trainerInfo = labTrainer[labId];
 
       // Only include if trainer exists (skip "Lab X" entries)
-      if (trainerName) {
-        if (!map[trainerName]) map[trainerName] = { pass: 0, fail: 0 };
-        if (r.is_pass) map[trainerName].pass++;
-        else           map[trainerName].fail++;
+      if (trainerInfo) {
+        if (!map[trainerInfo.trainer_id]) {
+          map[trainerInfo.trainer_id] = { name: trainerInfo.name, pass: 0, fail: 0 };
+        }
+        if (r.is_pass) map[trainerInfo.trainer_id].pass++;
+        else           map[trainerInfo.trainer_id].fail++;
       }
     });
-    return Object.entries(map)
-      .map(([name, v]) => ({ name, ...v, total: v.pass + v.fail }))
+    return Object.values(map)
+      .map((v) => ({ ...v, total: v.pass + v.fail }))
       .sort((a, b) => b.total - a.total)
       .slice(0, 6);
-  }, [results, students, labs]);
+  }, [filteredResults, students, labs]);
 
   const summaryCards = [
-    { title: "Total Students",  value: students.length, tone: "primary", description: "Students currently registered." },
-    { title: "Total Batches",   value: batches.length,  tone: "success", description: "Active training batches." },
+    { title: "Total Students",  value: filteredResults.length, tone: "primary", description: "Students in results." },
+    { title: "Total Batches",   value: selectedCourse ? batches.filter((b) => String(b.course) === selectedCourse).length : batches.length,  tone: "success", description: "Active training batches." },
     { title: "Final Exam Pass", value: passCount,        tone: "info",    description: "Students who passed the Final Exam." },
-    { title: "Mock Eligible",   value: useMemo(() => results.filter((r) => r.is_final_mock_pass).length, [results]),   tone: "warning", description: "Students who passed the Final Mock (≥70%)." },
+    { title: "Mock Eligible",   value: useMemo(() => filteredResults.filter((r) => r.is_final_mock_pass).length, [filteredResults]),   tone: "warning", description: "Students who passed the Final Mock (≥70%)." },
   ];
 
   return (
@@ -156,6 +194,63 @@ function DashboardPage() {
       />
 
       {error && <div className="alert alert-danger">{error}</div>}
+
+      {/* Filters */}
+      <div className="card shadow-sm border-0 mb-4">
+        <div className="card-body">
+          <div className="row g-3">
+            <div className="col-sm-6 col-lg-3">
+              <label className="form-label mb-2" htmlFor="filter-batch">Filter by Batch</label>
+              <select
+                id="filter-batch"
+                className="form-select form-select-sm"
+                value={selectedBatch}
+                onChange={(e) => setSelectedBatch(e.target.value)}
+              >
+                <option value="">All Batches</option>
+                {batches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+            </div>
+
+            <div className="col-sm-6 col-lg-3">
+              <label className="form-label mb-2" htmlFor="filter-course">Filter by Course</label>
+              <select
+                id="filter-course"
+                className="form-select form-select-sm"
+                value={selectedCourse}
+                onChange={(e) => setSelectedCourse(e.target.value)}
+              >
+                <option value="">All Courses</option>
+                {courses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+
+            <div className="col-sm-6 col-lg-3">
+              <label className="form-label mb-2" htmlFor="filter-trainer">Filter by Trainer</label>
+              <select
+                id="filter-trainer"
+                className="form-select form-select-sm"
+                value={selectedTrainer}
+                onChange={(e) => setSelectedTrainer(e.target.value)}
+              >
+                <option value="">All Trainers</option>
+                {trainers.map((t) => <option key={t.id} value={t.id}>{t.username}</option>)}
+              </select>
+            </div>
+
+            <div className="col-sm-6 col-lg-3">
+              <label className="form-label mb-2">&nbsp;</label>
+              <button
+                type="button"
+                className="btn btn-outline-secondary btn-sm w-100"
+                onClick={() => { setSelectedBatch(""); setSelectedCourse(""); setSelectedTrainer(""); }}
+              >
+                Reset Filters
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Stat cards */}
       <div className="row g-4 mb-4">
@@ -185,7 +280,12 @@ function DashboardPage() {
         <div className="col-lg-8">
           <div className="card shadow-sm border-0 h-100">
             <div className="card-body">
-              <h2 className="h5 mb-3">Batch Performance</h2>
+              <div className="d-flex justify-content-between align-items-center mb-3">
+                <h2 className="h5 mb-0">Batch Performance</h2>
+                {(selectedBatch || selectedCourse || selectedTrainer) && (
+                  <small className="text-muted">Filtered view</small>
+                )}
+              </div>
               {isLoading ? <p className="text-secondary">Loading…</p> : batchPerf.length === 0 ? (
                 <p className="text-secondary small">No result data yet.</p>
               ) : (
@@ -204,7 +304,12 @@ function DashboardPage() {
           <div className="col-12">
             <div className="card shadow-sm border-0">
               <div className="card-body">
-                <h2 className="h5 mb-3">Trainer / Batch Performance</h2>
+                <div className="d-flex justify-content-between align-items-center mb-3">
+                  <h2 className="h5 mb-0">Trainer / Batch Performance</h2>
+                  {(selectedBatch || selectedCourse || selectedTrainer) && (
+                    <small className="text-muted">Filtered view</small>
+                  )}
+                </div>
                 {isLoading ? <p className="text-secondary">Loading…</p> : trainerPerf.length === 0 ? (
                   <p className="text-secondary small">No trainer result data yet.</p>
                 ) : (

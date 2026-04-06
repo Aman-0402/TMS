@@ -5,6 +5,7 @@ from django.db.models import F, Q
 class Course(models.Model):
     name = models.CharField(max_length=100)
     certification = models.CharField(max_length=100)
+    is_active = models.BooleanField(default=True)
     is_deleted = models.BooleanField(default=False, db_index=True)
     deleted_at = models.DateTimeField(null=True, blank=True)
 

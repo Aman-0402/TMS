@@ -6,7 +6,7 @@ from .models import Batch, Course
 class CourseSerializer(serializers.ModelSerializer):
     class Meta:
         model = Course
-        fields = ("id", "name", "certification")
+        fields = ("id", "name", "certification", "is_active")
         read_only_fields = ("id",)
 
 
