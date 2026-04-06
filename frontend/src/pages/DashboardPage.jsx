@@ -41,6 +41,7 @@ function DashboardPage() {
   const [batches,  setBatches]  = useState([]);
   const [results,  setResults]  = useState([]);
   const [trainers, setTrainers] = useState([]);
+  const [labs,     setLabs]     = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError]         = useState("");
 
@@ -49,14 +50,16 @@ function DashboardPage() {
       http.get("students/"),
       http.get("batches/"),
       http.get("results/"),
+      http.get("labs/"),
     ];
     if (showFull) promises.push(http.get("trainers/"));
 
     Promise.all(promises)
-      .then(([sRes, bRes, rRes, tRes]) => {
+      .then(([sRes, bRes, rRes, lRes, tRes]) => {
         setStudents(normalizeApiList(sRes.data));
         setBatches(normalizeApiList(bRes.data));
         setResults(normalizeApiList(rRes.data));
+        setLabs(normalizeApiList(lRes.data));
         if (tRes) setTrainers(normalizeApiList(tRes.data));
       })
       .catch(() => setError("Unable to load dashboard data."))
@@ -110,18 +113,24 @@ function DashboardPage() {
 
   // ── Trainer performance ────────────────────────────────────────────────
   const trainerPerf = useMemo(() => {
-    const studentBatch = {};
-    students.forEach((s) => { studentBatch[s.id] = s.batch; });
+    const studentLab = {};
+    students.forEach((s) => { studentLab[s.id] = s.lab; });
 
-    const batchTrainer = {};
-    trainers.forEach((t) => {
-      if (t.batch) batchTrainer[t.batch] = t.name || t.username || `Trainer ${t.id}`;
+    const labTrainer = {};
+    labs.forEach((l) => {
+      if (l.trainer) {
+        labTrainer[l.id] = l.trainer_name || `Lab ${l.name}`;
+      }
     });
 
     const map = {};
     results.forEach((r) => {
-      const batchId   = r.batch;
-      const trainerName = batchTrainer[batchId] || `Batch ${batchId}`;
+      const student = students.find((s) => s.id === r.student);
+      if (!student) return;
+      
+      const labId = student.lab;
+      const trainerName = labTrainer[labId] || `Lab ${labId || 'Unassigned'}`;
+      
       if (!map[trainerName]) map[trainerName] = { pass: 0, fail: 0 };
       if (r.is_pass) map[trainerName].pass++;
       else           map[trainerName].fail++;
@@ -130,7 +139,7 @@ function DashboardPage() {
       .map(([name, v]) => ({ name, ...v, total: v.pass + v.fail }))
       .sort((a, b) => b.total - a.total)
       .slice(0, 6);
-  }, [results, students, trainers]);
+  }, [results, students, labs]);
 
   const summaryCards = [
     { title: "Total Students",  value: students.length, tone: "primary", description: "Students currently registered." },

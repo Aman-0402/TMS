@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import Swal from "sweetalert2";
 
@@ -20,37 +20,69 @@ function ResultForm({ batches, students, onSaved, editingResult, onCancel }) {
   const [formData, setFormData] = useState({
     batch: editingResult?.batch ?? "",
     student: editingResult?.student ?? "",
-    mid_mock: editingResult?.mid_mock ?? 0,
     final_mock: editingResult?.final_mock ?? 0,
     final_exam: editingResult?.final_exam ?? 0,
   });
   const [batchStudents, setBatchStudents] = useState([]);
+  const [studentSearchTerm, setStudentSearchTerm] = useState("");
   const [isSubmitting, setIsSubmitting]   = useState(false);
   const [error, setError]                 = useState("");
+  const [existingResults, setExistingResults] = useState({});
 
   useEffect(() => {
     if (formData.batch) {
       const filtered = students.filter((s) => String(s.batch) === String(formData.batch));
       setBatchStudents(filtered);
+      
+      // Fetch existing results for this batch to get mock scores
+      http.get(`results/?batch=${formData.batch}`)
+        .then((rRes) => {
+          const resultList = normalizeList(rRes.data);
+          const resMap = {};
+          resultList.forEach((r) => { resMap[r.student] = r; });
+          setExistingResults(resMap);
+        })
+        .catch(() => {});
     } else {
       setBatchStudents([]);
+      setExistingResults({});
     }
   }, [formData.batch, students]);
 
+  const filteredBatchStudents = useMemo(() => {
+    const normalized = studentSearchTerm.trim().toLowerCase();
+    if (!normalized) return batchStudents;
+    return batchStudents.filter((student) =>
+      student.ug_number?.toLowerCase().includes(normalized) ||
+      student.name?.toLowerCase().includes(normalized)
+    );
+  }, [batchStudents, studentSearchTerm]);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData((prev) => {
+      const newData = { ...prev, [name]: value };
+      
+      // Autofill final_mock and final_exam when student is selected (only for new results, not editing)
+      if (name === "student" && value && !editingResult) {
+        const existingResult = existingResults[value];
+        if (existingResult) {
+          newData.final_mock = existingResult.final_mock || 0;
+          newData.final_exam = existingResult.final_exam || 0;
+        }
+      }
+      
+      return newData;
+    });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
 
-    const midMock   = parseFloat(formData.mid_mock);
     const finalMock = parseFloat(formData.final_mock);
     const finalExam = parseFloat(formData.final_exam);
 
-    if (midMock < 0 || midMock > 100)   { setError("Mid Mock must be 0–100."); return; }
     if (finalMock < 0 || finalMock > 100) { setError("Final Mock must be 0–100."); return; }
     if (finalExam < 0 || finalExam > 1000) { setError("Final Exam must be 0–1000."); return; }
 
@@ -59,7 +91,6 @@ function ResultForm({ batches, students, onSaved, editingResult, onCancel }) {
       const payload = {
         batch: Number(formData.batch),
         student: Number(formData.student),
-        mid_mock: midMock,
         final_mock: finalMock,
         final_exam: finalExam,
       };
@@ -68,15 +99,22 @@ function ResultForm({ batches, students, onSaved, editingResult, onCancel }) {
         await http.put(`results/${editingResult.id}/`, payload);
         toast.success("Result updated.");
       } else {
-        await http.post("results/", payload);
-        toast.success("Result saved.");
+        // Check if result already exists for this student-batch combination
+        const existingResult = existingResults[formData.student];
+        if (existingResult) {
+          await http.put(`results/${existingResult.id}/`, payload);
+          toast.success("Result updated.");
+        } else {
+          await http.post("results/", payload);
+          toast.success("Result saved.");
+        }
       }
       onSaved();
     } catch (err) {
       const data = err.response?.data;
       setError(
         data?.student?.[0] || data?.batch?.[0] || data?.non_field_errors?.[0] ||
-        data?.mid_mock?.[0] || data?.final_mock?.[0] || data?.final_exam?.[0] ||
+        data?.final_mock?.[0] || data?.final_exam?.[0] ||
         data?.error || "Failed to save result."
       );
     } finally {
@@ -110,6 +148,16 @@ function ResultForm({ batches, students, onSaved, editingResult, onCancel }) {
 
           <div className="mb-3">
             <label className="form-label" htmlFor="rf-student">Student</label>
+            {!editingResult && formData.batch && (
+              <input
+                id="rf-search"
+                type="search"
+                className="form-control mb-2"
+                placeholder="Search by UG number or name"
+                value={studentSearchTerm}
+                onChange={(e) => setStudentSearchTerm(e.target.value)}
+              />
+            )}
             <select
               id="rf-student"
               name="student"
@@ -120,32 +168,22 @@ function ResultForm({ batches, students, onSaved, editingResult, onCancel }) {
               required
             >
               <option value="">Select student</option>
-              {batchStudents.map((s) => (
+              {filteredBatchStudents.length > 0 ? filteredBatchStudents.map((s) => (
                 <option key={s.id} value={s.id}>{s.name} ({s.ug_number})</option>
-              ))}
+              )) : (
+                <option value="" disabled>No matching students</option>
+              )}
             </select>
           </div>
 
           <div className="row g-3 mb-3">
-            <div className="col-sm-4">
-              <label className="form-label" htmlFor="rf-mid">Mid Mock <span className="text-muted">/100</span></label>
-              <input
-                id="rf-mid"
-                name="mid_mock"
-                type="number"
-                className="form-control"
-                value={formData.mid_mock}
-                onChange={handleChange}
-                min={0}
-                max={100}
-                step={0.5}
-                required
-              />
-            </div>
-            <div className="col-sm-4">
+            <div className="col-sm-6">
               <label className="form-label" htmlFor="rf-mock">
                 Final Mock <span className="text-muted">/100</span>
                 <span className="ms-1 badge bg-warning text-dark" style={{ fontSize: "0.7rem" }}>Pass ≥{FINAL_MOCK_PASS}</span>
+                {!editingResult && formData.student && existingResults[formData.student] && existingResults[formData.student].final_mock > 0 && (
+                  <span className="ms-1 badge bg-info text-dark" style={{ fontSize: "0.7rem" }}>Autofilled from Trainer</span>
+                )}
               </label>
               <input
                 id="rf-mock"
@@ -160,10 +198,13 @@ function ResultForm({ batches, students, onSaved, editingResult, onCancel }) {
                 required
               />
             </div>
-            <div className="col-sm-4">
+            <div className="col-sm-6">
               <label className="form-label" htmlFor="rf-exam">
                 Final Exam <span className="text-muted">/1000</span>
                 <span className="ms-1 badge bg-warning text-dark" style={{ fontSize: "0.7rem" }}>Pass ≥{FINAL_EXAM_PASS}</span>
+                {!editingResult && formData.student && existingResults[formData.student] && existingResults[formData.student].final_exam > 0 && (
+                  <span className="ms-1 badge bg-success text-dark" style={{ fontSize: "0.7rem" }}>Autofilled from Previous Entry</span>
+                )}
               </label>
               <input
                 id="rf-exam"
@@ -207,12 +248,15 @@ function ResultsTable({ batches, students, title, showForm, role }) {
   const [isLoading, setIsLoading]             = useState(false);
   const [editingResult, setEditingResult]     = useState(null);
   const [attendanceSummary, setAttendanceSummary] = useState({});
+  const [searchTerm, setSearchTerm]           = useState("");
 
   // Filters
   const [filterFailedMock, setFilterFailedMock]   = useState(false);
   const [filterLowAtt, setFilterLowAtt]           = useState(false);
   const [lowAttThreshold, setLowAttThreshold]     = useState(75);
   const [filterEligible, setFilterEligible]       = useState(false);
+
+  const studentMap = useMemo(() => Object.fromEntries(students.map((s) => [s.id, s])), [students]);
 
   const canEdit = role === "ADMIN" || role === "MANAGER";
 
@@ -264,10 +308,25 @@ function ResultsTable({ batches, students, title, showForm, role }) {
     }
   };
 
-  // Apply low-attendance filter client-side (requires summary data)
-  const visibleResults = filterLowAtt
-    ? results.filter((r) => (attendanceSummary[r.student] ?? 100) < lowAttThreshold)
-    : results;
+  const visibleResults = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+
+    return results.filter((r) => {
+      const student = studentMap[r.student] || {};
+      const matchesSearch =
+        !normalizedSearch ||
+        student.ug_number?.toLowerCase().includes(normalizedSearch) ||
+        student.name?.toLowerCase().includes(normalizedSearch) ||
+        student.lab_name?.toLowerCase().includes(normalizedSearch) ||
+        student.batch_name?.toLowerCase().includes(normalizedSearch) ||
+        r.student_name?.toLowerCase().includes(normalizedSearch);
+
+      const attPct = attendanceSummary[r.student] ?? 100;
+      const matchesLowAtt = !filterLowAtt || attPct < lowAttThreshold;
+
+      return matchesSearch && matchesLowAtt;
+    });
+  }, [results, searchTerm, studentMap, attendanceSummary, filterLowAtt, lowAttThreshold]);
 
   return (
     <div className="row g-4">
@@ -285,16 +344,53 @@ function ResultsTable({ batches, students, title, showForm, role }) {
       )}
 
       <div className={showForm ? "col-lg-8" : "col-12"}>
+        {!showForm && editingResult && (
+          <>
+            <div className="modal-backdrop fade show" />
+            <div className="modal d-block" tabIndex="-1">
+              <div className="modal-dialog modal-dialog-centered modal-lg">
+                <div className="modal-content">
+                  <div className="modal-header">
+                    <h5 className="modal-title">Edit Result</h5>
+                    <button type="button" className="btn-close" aria-label="Close" onClick={() => setEditingResult(null)} />
+                  </div>
+                  <div className="modal-body">
+                    <ResultForm
+                      batches={batches}
+                      students={students}
+                      editingResult={editingResult}
+                      onSaved={() => { setEditingResult(null); loadResults(selectedBatch); }}
+                      onCancel={() => setEditingResult(null)}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
         {/* Filters bar */}
         <div className="card shadow-sm border-0 mb-3">
           <div className="card-body p-3">
             <div className="row g-3 align-items-end">
-              <div className="col-sm-4">
+              <div className="col-sm-3">
                 <label className="form-label mb-1" htmlFor="rt-batch">Batch</label>
                 <select id="rt-batch" className="form-select form-select-sm" value={selectedBatch} onChange={(e) => { setSelectedBatch(e.target.value); setEditingResult(null); }}>
                   <option value="">Select batch</option>
                   {batches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
                 </select>
+              </div>
+
+              <div className="col-sm-5">
+                <label className="form-label mb-1" htmlFor="rt-search">Search</label>
+                <input
+                  id="rt-search"
+                  type="search"
+                  className="form-control form-control-sm"
+                  placeholder="UG number, name, batch, or lab"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  disabled={!selectedBatch}
+                />
               </div>
 
               <div className="col-auto d-flex flex-wrap gap-3 align-items-center">
@@ -380,8 +476,8 @@ function ResultsTable({ batches, students, title, showForm, role }) {
                     <tr>
                       <th>#</th>
                       <th>Student</th>
+                      <th>Lab</th>
                       <th>Attendance</th>
-                      <th>Mid Mock<br /><span className="fw-normal text-muted">/100</span></th>
                       <th>Final Mock<br /><span className="fw-normal text-muted">/100</span></th>
                       <th>Mock Status</th>
                       <th>Final Exam<br /><span className="fw-normal text-muted">/1000</span></th>
@@ -391,6 +487,7 @@ function ResultsTable({ batches, students, title, showForm, role }) {
                   </thead>
                   <tbody>
                     {visibleResults.map((r, idx) => {
+                      const student = studentMap[r.student] || {};
                       const attPct = attendanceSummary[r.student] ?? null;
                       const isLowAtt = attPct !== null && attPct < lowAttThreshold;
                       return (
@@ -398,7 +495,9 @@ function ResultsTable({ batches, students, title, showForm, role }) {
                           <td className="text-muted">{idx + 1}</td>
                           <td>
                             <div className="fw-medium">{r.student_name}</div>
+                            <div className="text-muted small">{student.ug_number || "—"}</div>
                           </td>
+                          <td>{student.lab_name || "—"}</td>
                           <td>
                             {attPct !== null ? (
                               <span className={`badge bg-${attPct >= 75 ? "success" : attPct >= 50 ? "warning text-dark" : "danger"}`}>
@@ -406,7 +505,6 @@ function ResultsTable({ batches, students, title, showForm, role }) {
                               </span>
                             ) : <span className="text-muted">—</span>}
                           </td>
-                          <td>{r.mid_mock}</td>
                           <td>{r.final_mock}</td>
                           <td>
                             {r.is_final_mock_pass
