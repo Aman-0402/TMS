@@ -154,6 +154,7 @@ class AvailableTrainerUserListView(generics.ListAPIView):
         return User.objects.filter(
             role="TRAINER",
             is_approved=True,
+            is_active=True,
         ).select_related("trainer_profile", "trainer_profile__batch").prefetch_related("trainer_profile__labs").order_by("username")
 
 
@@ -165,6 +166,7 @@ class AvailableManagerUserListView(generics.ListAPIView):
         return User.objects.filter(
             role="MANAGER",
             is_approved=True,
+            is_active=True,
         ).select_related("manager", "manager__batch").order_by("username")
 
 
@@ -212,8 +214,8 @@ class AdminUserListView(generics.ListAPIView):
         return qs
 
 
-class AdminUserDetailView(generics.RetrieveUpdateAPIView):
-    """Admin can view and update any user's profile fields (email, name)."""
+class AdminUserDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Admin can view, update, and delete any user's profile."""
     serializer_class = AdminUserSerializer
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 

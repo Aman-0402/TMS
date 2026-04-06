@@ -219,7 +219,7 @@ class AdminUserSerializer(serializers.ModelSerializer):
         fields = (
             "id", "username", "first_name", "last_name", "full_name",
             "email", "role", "is_approved", "is_rejected", "rejection_reason",
-            "approval_status", "batch_name", "date_joined", "last_login",
+            "approval_status", "batch_name", "date_joined", "last_login", "is_active",
         )
         read_only_fields = (
             "id", "username", "role", "is_approved", "is_rejected",

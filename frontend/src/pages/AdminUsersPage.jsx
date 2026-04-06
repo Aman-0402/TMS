@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "react-toastify";
+import Swal from "sweetalert2";
 
 import http from "../api/http";
 import PageHeader from "../components/common/PageHeader";
@@ -31,6 +32,7 @@ function EditPanel({ user, onClose, onSaved }) {
   const [firstName, setFirstName] = useState(user.first_name || "");
   const [lastName,  setLastName]  = useState(user.last_name  || "");
   const [email,     setEmail]     = useState(user.email      || "");
+  const [isActive,  setIsActive]  = useState(user.is_active ?? true);
   const [isSaving,  setIsSaving]  = useState(false);
 
   const handleSave = async (e) => {
@@ -41,6 +43,7 @@ function EditPanel({ user, onClose, onSaved }) {
         first_name: firstName.trim(),
         last_name:  lastName.trim(),
         email:      email.trim(),
+        is_active:  isActive,
       });
       toast.success(`${user.username}'s profile updated.`);
       onSaved();
@@ -96,6 +99,21 @@ function EditPanel({ user, onClose, onSaved }) {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="email@example.com"
             />
+          </div>
+
+          <div className="mb-4">
+            <div className="form-check form-switch">
+              <input
+                id="ep-active"
+                className="form-check-input"
+                type="checkbox"
+                checked={isActive}
+                onChange={(e) => setIsActive(e.target.checked)}
+              />
+              <label className="form-check-label" htmlFor="ep-active">
+                Active (able to access the system)
+              </label>
+            </div>
           </div>
 
           <hr />
@@ -177,6 +195,60 @@ function AdminUsersPage() {
     loadUsers();
   };
 
+  const handleDeactivate = async (user) => {
+    const result = await Swal.fire({
+      title: "Deactivate User?",
+      html: `<p class="mb-0">Are you sure you want to deactivate <strong>${user.username}</strong>?</p><p class="text-muted small">They will not appear in available lists and cannot access the system.</p>`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#dc3545",
+      confirmButtonText: "Deactivate",
+      cancelButtonText: "Cancel",
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await http.patch(`users/${user.id}/`, { is_active: false });
+        toast.success(`${user.username} deactivated.`);
+        loadUsers();
+      } catch (err) {
+        toast.error(err.response?.data?.detail || "Failed to deactivate user.");
+      }
+    }
+  };
+
+  const handleActivate = async (user) => {
+    try {
+      await http.patch(`users/${user.id}/`, { is_active: true });
+      toast.success(`${user.username} activated.`);
+      loadUsers();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "Failed to activate user.");
+    }
+  };
+
+  const handleDelete = async (user) => {
+    const result = await Swal.fire({
+      title: "Delete User?",
+      html: `<p class="mb-0">Are you sure you want to permanently delete <strong>${user.username}</strong>?</p><p class="text-muted small">This action cannot be undone.</p>`,
+      icon: "error",
+      showCancelButton: true,
+      confirmButtonColor: "#dc3545",
+      confirmButtonText: "Delete",
+      cancelButtonText: "Cancel",
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await http.delete(`users/${user.id}/`);
+        toast.success(`${user.username} deleted.`);
+        loadUsers();
+      } catch (err) {
+        toast.error(err.response?.data?.detail || "Failed to delete user.");
+      }
+    }
+  };
+
   return (
     <>
       <PageHeader
@@ -227,21 +299,23 @@ function AdminUsersPage() {
                   <table className="table table-hover align-middle mb-0">
                     <thead className="table-light">
                       <tr>
+                        <th style={{ width: '60px' }}>S. No</th>
                         <th>User</th>
                         <th>Email</th>
                         <th>Role</th>
                         <th>Batch</th>
                         <th>Status</th>
-                        <th>Joined</th>
+                        <th>Active</th>
                         <th className="text-end">Action</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {users.map((user) => (
+                      {users.map((user, index) => (
                         <tr
                           key={user.id}
                           className={editing?.id === user.id ? "table-active" : ""}
                         >
+                          <td className="text-muted fw-semibold">{index + 1}</td>
                           <td>
                             <div className="d-flex align-items-center gap-2">
                               <div
@@ -270,15 +344,49 @@ function AdminUsersPage() {
                               {user.approval_status}
                             </span>
                           </td>
-                          <td className="text-muted small">{formatDateTime(user.date_joined)}</td>
+                          <td>
+                            <span className={`badge ${user.is_active ? "bg-success" : "bg-secondary"}`}>
+                              {user.is_active ? "Active" : "Inactive"}
+                            </span>
+                          </td>
                           <td className="text-end">
-                            <button
-                              type="button"
-                              className={`btn btn-sm ${editing?.id === user.id ? "btn-secondary" : "btn-outline-primary"}`}
-                              onClick={() => setEditing(editing?.id === user.id ? null : user)}
-                            >
-                              {editing?.id === user.id ? "Close" : "Edit"}
-                            </button>
+                            <div className="btn-group btn-group-sm" role="group">
+                              <button
+                                type="button"
+                                className={`btn ${editing?.id === user.id ? "btn-secondary" : "btn-outline-primary"}`}
+                                onClick={() => setEditing(editing?.id === user.id ? null : user)}
+                                title="Edit user details"
+                              >
+                                Edit
+                              </button>
+                              {user.is_active ? (
+                                <button
+                                  type="button"
+                                  className="btn btn-outline-warning"
+                                  onClick={() => handleDeactivate(user)}
+                                  title="Deactivate this user"
+                                >
+                                  Deactivate
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="btn btn-outline-success"
+                                  onClick={() => handleActivate(user)}
+                                  title="Activate this user"
+                                >
+                                  Activate
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                className="btn btn-outline-danger"
+                                onClick={() => handleDelete(user)}
+                                title="Delete this user permanently"
+                              >
+                                Delete
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
