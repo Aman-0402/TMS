@@ -48,7 +48,8 @@ class TrainerSerializer(serializers.ModelSerializer):
             user=validated_data["user"],
             defaults={"batch": validated_data["batch"]},
         )
-        trainer.labs.exclude(batch=trainer.batch).update(trainer=None)
+        # Clear all labs from this trainer (replace, not add)
+        trainer.labs.all().update(trainer=None)
 
         if lab:
             lab.trainer = trainer
@@ -63,7 +64,9 @@ class TrainerSerializer(serializers.ModelSerializer):
             setattr(instance, attribute, value)
 
         instance.save()
-        instance.labs.exclude(batch=instance.batch).update(trainer=None)
+
+        # Clear all labs from this trainer (replace, not add)
+        instance.labs.all().update(trainer=None)
 
         if lab:
             lab.trainer = instance
