@@ -283,6 +283,7 @@ function TrainersPage() {
                   <table className="table table-hover align-middle mb-0">
                     <thead className="table-light">
                       <tr>
+                        <th scope="col" style={{ width: '60px' }}>S. No</th>
                         <th scope="col">Username</th>
                         <th scope="col">Email</th>
                         <th scope="col">Batch</th>
@@ -291,8 +292,9 @@ function TrainersPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {trainerUsers.map((trainerUser) => (
+                      {trainerUsers.map((trainerUser, index) => (
                         <tr key={trainerUser.id}>
+                          <td className="text-muted fw-semibold">{index + 1}</td>
                           <td>{trainerUser.username}</td>
                           <td>{trainerUser.email || "-"}</td>
                           <td>{trainerUser.current_batch_name || "Unassigned"}</td>
