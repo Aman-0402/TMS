@@ -10,23 +10,29 @@ function normalizeApiList(responseData) {
 function StudentsListPage() {
   const [students, setStudents] = useState([]);
   const [batches, setBatches] = useState([]);
+  const [labs, setLabs] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedBatch, setSelectedBatch] = useState("");
+  const [selectedLab, setSelectedLab] = useState("");
+  const [sortField, setSortField] = useState("lab_name");
+  const [sortDirection, setSortDirection] = useState("asc");
 
   useEffect(() => {
     const loadData = async () => {
       setError("");
 
       try {
-        const [studentsResponse, batchesResponse] = await Promise.all([
+        const [studentsResponse, batchesResponse, labsResponse] = await Promise.all([
           http.get("students/"),
           http.get("batches/"),
+          http.get("labs/"),
         ]);
 
         setStudents(normalizeApiList(studentsResponse.data));
         setBatches(normalizeApiList(batchesResponse.data));
+        setLabs(normalizeApiList(labsResponse.data));
       } catch (requestError) {
         setError("Unable to load students. Please try again.");
       } finally {
@@ -40,9 +46,11 @@ function StudentsListPage() {
   const filteredStudents = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
 
-    return students.filter((student) => {
+    let filtered = students.filter((student) => {
       const matchesBatch =
         !selectedBatch || String(student.batch) === selectedBatch;
+      const matchesLab =
+        !selectedLab || String(student.lab) === selectedLab;
       const matchesSearch =
         !normalizedSearch ||
         student.ug_number?.toLowerCase().includes(normalizedSearch) ||
@@ -51,9 +59,29 @@ function StudentsListPage() {
         student.batch_name?.toLowerCase().includes(normalizedSearch) ||
         student.lab_name?.toLowerCase().includes(normalizedSearch);
 
-      return matchesBatch && matchesSearch;
+      return matchesBatch && matchesLab && matchesSearch;
     });
-  }, [searchTerm, selectedBatch, students]);
+
+    // Sort the filtered results
+    filtered.sort((a, b) => {
+      let aValue = a[sortField] || "";
+      let bValue = b[sortField] || "";
+
+      // Handle numeric sorting for lab names that might contain numbers
+      if (sortField === "lab_name") {
+        const aNum = parseInt(aValue.replace(/\D/g, "")) || 0;
+        const bNum = parseInt(bValue.replace(/\D/g, "")) || 0;
+        aValue = aNum;
+        bValue = bNum;
+      }
+
+      if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
+      return 0;
+    });
+
+    return filtered;
+  }, [searchTerm, selectedBatch, selectedLab, students, sortField, sortDirection]);
 
   return (
     <>
@@ -65,7 +93,7 @@ function StudentsListPage() {
       <div className="card shadow-sm border-0">
         <div className="card-body">
           <div className="row g-3 align-items-end mb-4">
-            <div className="col-md-7">
+            <div className="col-md-4">
               <label className="form-label fw-semibold" htmlFor="student-search">
                 Search Students
               </label>
@@ -79,7 +107,7 @@ function StudentsListPage() {
               />
             </div>
 
-            <div className="col-md-5">
+            <div className="col-md-2">
               <label className="form-label fw-semibold" htmlFor="student-batch-filter">
                 Filter by Batch
               </label>
@@ -95,6 +123,58 @@ function StudentsListPage() {
                     {batch.name}
                   </option>
                 ))}
+              </select>
+            </div>
+
+            <div className="col-md-2">
+              <label className="form-label fw-semibold" htmlFor="student-lab-filter">
+                Filter by Lab
+              </label>
+              <select
+                id="student-lab-filter"
+                className="form-select"
+                value={selectedLab}
+                onChange={(event) => setSelectedLab(event.target.value)}
+              >
+                <option value="">All labs</option>
+                {labs.map((lab) => (
+                  <option key={lab.id} value={lab.id}>
+                    {lab.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="col-md-2">
+              <label className="form-label fw-semibold" htmlFor="student-sort">
+                Sort by
+              </label>
+              <select
+                id="student-sort"
+                className="form-select"
+                value={sortField}
+                onChange={(event) => setSortField(event.target.value)}
+              >
+                <option value="lab_name">Lab</option>
+                <option value="name">Name</option>
+                <option value="ug_number">UG Number</option>
+                <option value="department">Department</option>
+                <option value="batch_name">Batch</option>
+              </select>
+            </div>
+
+            <div className="col-md-2">
+              <label className="form-label fw-semibold" htmlFor="student-sort-direction">
+                Order
+              </label>
+              <select
+                id="student-sort-direction"
+                className="form-select"
+                value={sortDirection}
+                onChange={(event) => setSortDirection(event.target.value)}
+              >
+                <option value="asc">Ascending</option>
+                <option value="desc">Descending</option>
               </select>
             </div>
           </div>
