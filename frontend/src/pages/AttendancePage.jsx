@@ -212,6 +212,8 @@ function WorkingDaysManager({ batches }) {
 // ---------------------------------------------------------------------------
 function AttendanceReport({ batches }) {
   const [selectedBatch, setSelectedBatch] = useState("");
+  const [selectedLab, setSelectedLab] = useState("");
+  const [labs, setLabs] = useState([]);
   const [selectedDate, setSelectedDate]   = useState("");
   const [selectedSlot, setSelectedSlot]   = useState("1");
   const [workingDays, setWorkingDays]     = useState([]);
@@ -219,10 +221,23 @@ function AttendanceReport({ batches }) {
   const [isLoading, setIsLoading]         = useState(false);
 
   useEffect(() => {
-    if (!selectedBatch) { setWorkingDays([]); setSelectedDate(""); setRecords([]); return; }
-    http.get(`working-days/?batch=${selectedBatch}`)
-      .then((res) => setWorkingDays(normalizeList(res.data)))
-      .catch(() => {});
+    if (!selectedBatch) { 
+      setLabs([]); 
+      setSelectedLab(""); 
+      setWorkingDays([]); 
+      setSelectedDate(""); 
+      setRecords([]); 
+      return; 
+    }
+    // Load labs and working days
+    Promise.all([
+      http.get(`labs/?batch=${selectedBatch}`),
+      http.get(`working-days/?batch=${selectedBatch}`)
+    ]).then(([labsRes, wdRes]) => {
+      setLabs(normalizeList(labsRes.data));
+      setWorkingDays(normalizeList(wdRes.data));
+    }).catch(() => {});
+    setSelectedLab("");
     setSelectedDate("");
     setRecords([]);
   }, [selectedBatch]);
@@ -230,13 +245,18 @@ function AttendanceReport({ batches }) {
   useEffect(() => {
     if (!selectedBatch || !selectedDate) { setRecords([]); return; }
     setIsLoading(true);
-    http.get(`student-attendance/?batch=${selectedBatch}&date=${selectedDate}&slot=${selectedSlot}`)
+    let url = `student-attendance/?batch=${selectedBatch}&date=${selectedDate}&slot=${selectedSlot}`;
+    if (selectedLab) {
+      url += `&lab=${selectedLab}`;
+    }
+    http.get(url)
       .then((res) => setRecords(normalizeList(res.data)))
       .catch(() => toast.error("Failed to load attendance."))
       .finally(() => setIsLoading(false));
-  }, [selectedDate, selectedSlot, selectedBatch]);
+  }, [selectedDate, selectedSlot, selectedBatch, selectedLab]);
 
   const summary = records.reduce((acc, r) => { acc[r.status] = (acc[r.status] || 0) + 1; return acc; }, {});
+
 
   return (
     <div className="row g-4">
@@ -244,27 +264,37 @@ function AttendanceReport({ batches }) {
         <div className="card shadow-sm border-0">
           <div className="card-body p-4">
             <div className="row g-3 align-items-end">
-              <div className="col-sm-4">
+              <div className="col-sm-3">
                 <label className="form-label" htmlFor="rep-batch">Batch</label>
                 <select id="rep-batch" className="form-select" value={selectedBatch} onChange={(e) => setSelectedBatch(e.target.value)}>
                   <option value="">Select batch</option>
                   {batches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
                 </select>
               </div>
-              <div className="col-sm-4">
+              <div className="col-sm-3">
+                <label className="form-label" htmlFor="rep-lab">Lab</label>
+                <select id="rep-lab" className="form-select" value={selectedLab} onChange={(e) => setSelectedLab(e.target.value)} disabled={!selectedBatch || labs.length === 0}>
+                  <option value="">All labs ({labs.length})</option>
+                  {labs.map((lab) => (
+                    <option key={lab.id} value={lab.id}>{lab.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="col-sm-3">
                 <label className="form-label" htmlFor="rep-date">Working Day</label>
                 <select id="rep-date" className="form-select" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} disabled={!selectedBatch || workingDays.length === 0}>
                   <option value="">Select date</option>
                   {workingDays.map((d) => <option key={d.id} value={d.date}>{formatDate(d.date)}</option>)}
                 </select>
               </div>
-              <div className="col-sm-4">
+              <div className="col-sm-3">
                 <label className="form-label" htmlFor="rep-slot">Slot</label>
                 <select id="rep-slot" className="form-select" value={selectedSlot} onChange={(e) => setSelectedSlot(e.target.value)} disabled={!selectedDate}>
                   {SLOTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
                 </select>
               </div>
             </div>
+
           </div>
         </div>
       </div>

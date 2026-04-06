@@ -55,12 +55,15 @@ class StudentAttendanceViewSet(RoleScopedQuerysetMixin, viewsets.ModelViewSet):
         batch_id = self.request.query_params.get("batch")
         date = self.request.query_params.get("date")
         slot = self.request.query_params.get("slot")
+        lab_id = self.request.query_params.get("lab")
         if batch_id:
             qs = qs.filter(batch_id=batch_id)
         if date:
             qs = qs.filter(date=date)
         if slot:
             qs = qs.filter(slot=slot)
+        if lab_id:
+            qs = qs.filter(student__lab_id=lab_id)
         return qs
 
     def _assert_trainer_batch_access(self, batch):
