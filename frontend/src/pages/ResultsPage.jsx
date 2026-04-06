@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import Swal from "sweetalert2";
+import * as XLSX from "xlsx";
 
 import http from "../api/http";
 import { getRole } from "../utils/auth";
@@ -20,6 +21,7 @@ function ResultForm({ batches, students, onSaved, editingResult, onCancel }) {
   const [formData, setFormData] = useState({
     batch: editingResult?.batch ?? "",
     student: editingResult?.student ?? "",
+    mid_mock: editingResult?.mid_mock ?? 0,
     final_mock: editingResult?.final_mock ?? 0,
     final_exam: editingResult?.final_exam ?? 0,
   });
@@ -67,6 +69,7 @@ function ResultForm({ batches, students, onSaved, editingResult, onCancel }) {
       if (name === "student" && value && !editingResult) {
         const existingResult = existingResults[value];
         if (existingResult) {
+          newData.mid_mock = existingResult.mid_mock || 0;
           newData.final_mock = existingResult.final_mock || 0;
           newData.final_exam = existingResult.final_exam || 0;
         }
@@ -80,9 +83,11 @@ function ResultForm({ batches, students, onSaved, editingResult, onCancel }) {
     e.preventDefault();
     setError("");
 
+    const midMock = parseFloat(formData.mid_mock);
     const finalMock = parseFloat(formData.final_mock);
     const finalExam = parseFloat(formData.final_exam);
 
+    if (midMock < 0 || midMock > 100) { setError("Mid Mock must be 0–100."); return; }
     if (finalMock < 0 || finalMock > 100) { setError("Final Mock must be 0–100."); return; }
     if (finalExam < 0 || finalExam > 1000) { setError("Final Exam must be 0–1000."); return; }
 
@@ -91,6 +96,7 @@ function ResultForm({ batches, students, onSaved, editingResult, onCancel }) {
       const payload = {
         batch: Number(formData.batch),
         student: Number(formData.student),
+        mid_mock: midMock,
         final_mock: finalMock,
         final_exam: finalExam,
       };
@@ -178,6 +184,23 @@ function ResultForm({ batches, students, onSaved, editingResult, onCancel }) {
 
           <div className="row g-3 mb-3">
             <div className="col-sm-6">
+              <label className="form-label" htmlFor="rf-mid-mock">
+                Mid Mock <span className="text-muted">/100</span>
+              </label>
+              <input
+                id="rf-mid-mock"
+                name="mid_mock"
+                type="number"
+                className="form-control"
+                value={formData.mid_mock}
+                onChange={handleChange}
+                min={0}
+                max={100}
+                step={0.5}
+                required
+              />
+            </div>
+            <div className="col-sm-6">
               <label className="form-label" htmlFor="rf-mock">
                 Final Mock <span className="text-muted">/100</span>
                 <span className="ms-1 badge bg-warning text-dark" style={{ fontSize: "0.7rem" }}>Pass ≥{FINAL_MOCK_PASS}</span>
@@ -198,27 +221,28 @@ function ResultForm({ batches, students, onSaved, editingResult, onCancel }) {
                 required
               />
             </div>
-            <div className="col-sm-6">
-              <label className="form-label" htmlFor="rf-exam">
-                Final Exam <span className="text-muted">/1000</span>
-                <span className="ms-1 badge bg-warning text-dark" style={{ fontSize: "0.7rem" }}>Pass ≥{FINAL_EXAM_PASS}</span>
-                {!editingResult && formData.student && existingResults[formData.student] && existingResults[formData.student].final_exam > 0 && (
-                  <span className="ms-1 badge bg-success text-dark" style={{ fontSize: "0.7rem" }}>Autofilled from Previous Entry</span>
-                )}
-              </label>
-              <input
-                id="rf-exam"
-                name="final_exam"
-                type="number"
-                className="form-control"
-                value={formData.final_exam}
-                onChange={handleChange}
-                min={0}
-                max={1000}
-                step={1}
-                required
-              />
-            </div>
+          </div>
+
+          <div className="mb-3">
+            <label className="form-label" htmlFor="rf-exam">
+              Final Exam <span className="text-muted">/1000</span>
+              <span className="ms-1 badge bg-warning text-dark" style={{ fontSize: "0.7rem" }}>Pass ≥{FINAL_EXAM_PASS}</span>
+              {!editingResult && formData.student && existingResults[formData.student] && existingResults[formData.student].final_exam > 0 && (
+                <span className="ms-1 badge bg-success text-dark" style={{ fontSize: "0.7rem" }}>Autofilled from Previous Entry</span>
+              )}
+            </label>
+            <input
+              id="rf-exam"
+              name="final_exam"
+              type="number"
+              className="form-control"
+              value={formData.final_exam}
+              onChange={handleChange}
+              min={0}
+              max={1000}
+              step={1}
+              required
+            />
           </div>
 
           <div className="d-flex gap-2">
@@ -327,6 +351,37 @@ function ResultsTable({ batches, students, title, showForm, role }) {
       return matchesSearch && matchesLowAtt;
     });
   }, [results, searchTerm, studentMap, attendanceSummary, filterLowAtt, lowAttThreshold]);
+
+  const handleExport = () => {
+    if (visibleResults.length === 0) {
+      toast.warning("No results to export.");
+      return;
+    }
+
+    const exportData = visibleResults.map((r, idx) => {
+      const student = studentMap[r.student] || {};
+      const attPct = attendanceSummary[r.student] ?? null;
+      return {
+        "S. No": idx + 1,
+        "UG Number": student.ug_number || "—",
+        "Name": r.student_name,
+        "Lab": student.lab_name || "—",
+        "Attendance %": attPct !== null ? attPct : "—",
+        "Mid Mock": r.mid_mock || "—",
+        "Final Mock": r.final_mock || "—",
+        "Final Exam": r.final_exam || "—",
+        "Result": r.final_exam > 0 ? (r.is_pass ? "PASS" : "FAIL") : (r.is_final_mock_pass ? "Eligible" : "Not Eligible"),
+      };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Results");
+
+    const filename = `Student_Results_${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(wb, filename);
+    toast.success(`Exported ${visibleResults.length} student(s).`);
+  };
 
   return (
     <div className="row g-4">
@@ -458,9 +513,21 @@ function ResultsTable({ batches, students, title, showForm, role }) {
           <div className="card-body">
             <div className="d-flex justify-content-between align-items-center mb-3">
               <h2 className="h5 mb-0">{title}</h2>
-              {visibleResults.length > 0 && (
-                <span className="text-muted small">{visibleResults.length} student{visibleResults.length !== 1 ? "s" : ""}</span>
-              )}
+              <div className="d-flex gap-2 align-items-center">
+                {visibleResults.length > 0 && (
+                  <>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline-success"
+                      onClick={handleExport}
+                      title="Export to Excel"
+                    >
+                      📥 Export as .xlsx
+                    </button>
+                    <span className="text-muted small">{visibleResults.length} student{visibleResults.length !== 1 ? "s" : ""}</span>
+                  </>
+                )}
+              </div>
             </div>
 
             {!selectedBatch && <p className="text-secondary mb-0">Select a batch to view results.</p>}
@@ -478,6 +545,7 @@ function ResultsTable({ batches, students, title, showForm, role }) {
                       <th>Student</th>
                       <th>Lab</th>
                       <th>Attendance</th>
+                      <th>Mid Mock<br /><span className="fw-normal text-muted">/100</span></th>
                       <th>Final Mock<br /><span className="fw-normal text-muted">/100</span></th>
                       <th>Mock Status</th>
                       <th>Final Exam<br /><span className="fw-normal text-muted">/1000</span></th>
@@ -505,6 +573,7 @@ function ResultsTable({ batches, students, title, showForm, role }) {
                               </span>
                             ) : <span className="text-muted">—</span>}
                           </td>
+                          <td>{r.mid_mock || 0}</td>
                           <td>{r.final_mock}</td>
                           <td>
                             {r.is_final_mock_pass
