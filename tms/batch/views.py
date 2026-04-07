@@ -33,7 +33,7 @@ class CourseViewSet(SoftDeleteMixin, RequestDebugMixin, AuditLogMixin, viewsets.
 
     def get_queryset(self):
         self.debug_request_user("get_queryset")
-        return self.get_base_queryset().filter(is_deleted=False, is_active=True)
+        return self.get_base_queryset().filter(is_deleted=False)
 
     def validate_soft_delete(self, instance):
         if instance.batches.filter(is_deleted=False).exists():

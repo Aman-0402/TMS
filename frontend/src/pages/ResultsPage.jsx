@@ -23,6 +23,7 @@ function ResultForm({ batches, students, onSaved, editingResult, onCancel }) {
     student: editingResult?.student ?? "",
     final_mock: editingResult?.final_mock ?? 0,
     final_exam: editingResult?.final_exam ?? 0,
+    exam_date: editingResult?.exam_date ?? "",
   });
   const [batchStudents, setBatchStudents] = useState([]);
   const [studentSearchTerm, setStudentSearchTerm] = useState("");
@@ -64,12 +65,13 @@ function ResultForm({ batches, students, onSaved, editingResult, onCancel }) {
     setFormData((prev) => {
       const newData = { ...prev, [name]: value };
       
-      // Autofill final_mock and final_exam when student is selected (only for new results, not editing)
+      // Autofill fields when student is selected (only for new results, not editing)
       if (name === "student" && value && !editingResult) {
         const existingResult = existingResults[value];
         if (existingResult) {
           newData.final_mock = existingResult.final_mock || 0;
           newData.final_exam = existingResult.final_exam || 0;
+          newData.exam_date  = existingResult.exam_date  || "";
         }
       }
       
@@ -94,6 +96,7 @@ function ResultForm({ batches, students, onSaved, editingResult, onCancel }) {
         student: Number(formData.student),
         final_mock: finalMock,
         final_exam: finalExam,
+        exam_date: formData.exam_date || null,
       };
 
       if (editingResult) {
@@ -223,6 +226,21 @@ function ResultForm({ batches, students, onSaved, editingResult, onCancel }) {
             />
           </div>
 
+          <div className="mb-3">
+            <label className="form-label" htmlFor="rf-exam-date">
+              Exam Date
+              <span className="ms-1 text-muted" style={{ fontSize: "0.8rem" }}>When was the Final Exam held?</span>
+            </label>
+            <input
+              id="rf-exam-date"
+              name="exam_date"
+              type="date"
+              className="form-control"
+              value={formData.exam_date}
+              onChange={handleChange}
+            />
+          </div>
+
           <div className="d-flex gap-2">
             <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
               {isSubmitting ? (
@@ -347,6 +365,7 @@ function ResultsTable({ batches, students, title, showForm, role }) {
         "Attendance %": attPct !== null ? attPct : "—",
         "Final Mock": r.final_mock || "—",
         "Final Exam": r.final_exam || "—",
+        "Exam Date": r.exam_date ? new Date(r.exam_date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—",
         "Result": r.final_exam > 0 ? (r.is_pass ? "PASS" : "FAIL") : (r.is_final_mock_pass ? "Eligible" : "Not Eligible"),
       };
     });
@@ -525,6 +544,7 @@ function ResultsTable({ batches, students, title, showForm, role }) {
                       <th>Final Mock<br /><span className="fw-normal text-muted">/100</span></th>
                       <th>Mock Status</th>
                       <th>Final Exam<br /><span className="fw-normal text-muted">/1000</span></th>
+                      <th>Exam Date</th>
                       <th>Result</th>
                       {canEdit && <th className="text-end">Actions</th>}
                     </tr>
@@ -556,6 +576,11 @@ function ResultsTable({ batches, students, title, showForm, role }) {
                               : <span className="badge bg-danger">Failed</span>}
                           </td>
                           <td>{r.final_exam > 0 ? r.final_exam : <span className="text-muted">—</span>}</td>
+                          <td>
+                            {r.exam_date
+                              ? new Date(r.exam_date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+                              : <span className="text-muted">—</span>}
+                          </td>
                           <td>
                             {r.final_exam > 0
                               ? r.is_pass

@@ -28,6 +28,7 @@ class BatchSerializer(serializers.ModelSerializer):
             "created_by",
             "created_by_username",
             "status",
+            "is_active",
             "created_at",
             "updated_at",
         )

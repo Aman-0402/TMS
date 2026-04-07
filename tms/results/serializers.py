@@ -18,6 +18,7 @@ class ResultSerializer(serializers.ModelSerializer):
             "mid_mock",
             "final_mock",
             "final_exam",
+            "exam_date",
             "is_final_mock_pass",
             "total_percentage",
             "is_pass",

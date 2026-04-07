@@ -42,6 +42,7 @@ class Batch(models.Model):
         default=Status.ACTIVE,
         db_index=True,
     )
+    is_active = models.BooleanField(default=True)
     is_deleted = models.BooleanField(default=False, db_index=True)
     deleted_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

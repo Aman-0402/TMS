@@ -28,6 +28,7 @@ class Result(models.Model):
         default=0,
         validators=[MinValueValidator(0), MaxValueValidator(1000)],
     )
+    exam_date = models.DateField(null=True, blank=True)
     # Computed on save
     is_final_mock_pass = models.BooleanField(default=False, editable=False)
     is_pass = models.BooleanField(default=False, editable=False)
