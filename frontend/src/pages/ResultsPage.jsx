@@ -625,6 +625,568 @@ function ResultsTable({ batches, students, title, showForm, role }) {
 }
 
 // ---------------------------------------------------------------------------
+// Result Checker — compare system results against official Exam Admin Excel
+// ---------------------------------------------------------------------------
+function ResultChecker({ batches, students }) {
+  // ── state ──────────────────────────────────────────────────────────────────
+  const [step, setStep]                   = useState(1);  // 1 | 2 | 3
+  const [selectedBatch, setSelectedBatch] = useState("");
+  const [systemResults, setSystemResults] = useState([]);
+  const [isLoadingResults, setIsLoadingResults] = useState(false);
+
+  // excel upload
+  const [fileName, setFileName]   = useState("");
+  const [excelRows, setExcelRows] = useState([]);
+  const [headers, setHeaders]     = useState([]);
+  const [colUG, setColUG]         = useState("");
+  const [colMarks, setColMarks]   = useState("");
+  const [colResult, setColResult] = useState("");
+
+  // comparison output
+  const [comparison, setComparison] = useState(null);
+  const [filterMode, setFilterMode] = useState("all");
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const studentMap = useMemo(
+    () => Object.fromEntries(students.map((s) => [s.id, s])),
+    [students]
+  );
+
+  // ── step 1 ─────────────────────────────────────────────────────────────────
+  const loadSystemResults = async () => {
+    if (!selectedBatch) return;
+    setIsLoadingResults(true);
+    try {
+      const res  = await http.get(`results/?batch=${selectedBatch}`);
+      const list = normalizeList(res.data);
+      if (list.length === 0) toast.warning("No results found for this batch in the system.");
+      setSystemResults(list);
+      setStep(2);
+    } catch {
+      toast.error("Failed to load system results.");
+    } finally {
+      setIsLoadingResults(false);
+    }
+  };
+
+  // ── step 2 ─────────────────────────────────────────────────────────────────
+  const autoDetect = (hdrs) => {
+    const lc   = hdrs.map((h) => h.toLowerCase());
+    const find = (terms) => {
+      const idx = lc.findIndex((h) => terms.some((t) => h.includes(t)));
+      return idx >= 0 ? hdrs[idx] : "";
+    };
+    return {
+      ug:     find(["ug", "reg", "roll", "regno", "student id"]),
+      marks:  find(["marks", "score", "obtain", "total", "exam mark", "final"]),
+      result: find(["result", "status", "pass", "fail"]),
+    };
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const wb  = XLSX.read(evt.target.result, { type: "array" });
+        const ws  = wb.Sheets[wb.SheetNames[0]];
+        const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+
+        // Find first row with >1 non-empty cell (the header row)
+        let hRow = 0;
+        for (let i = 0; i < Math.min(raw.length, 10); i++) {
+          if (raw[i].filter((c) => String(c).trim()).length > 1) { hRow = i; break; }
+        }
+
+        const hdrs = raw[hRow].map((h) => String(h || "").trim()).filter(Boolean);
+        const rows = raw.slice(hRow + 1).filter((r) => r.some((c) => String(c).trim() !== ""));
+
+        setHeaders(hdrs);
+        setExcelRows(rows);
+        const det = autoDetect(hdrs);
+        setColUG(det.ug); setColMarks(det.marks); setColResult(det.result);
+      } catch {
+        toast.error("Failed to read Excel file. Please check the file format.");
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  // ── run comparison ─────────────────────────────────────────────────────────
+  const runComparison = () => {
+    if (!colUG) { toast.error("Please select the UG Number column."); return; }
+
+    const ugIdx     = headers.indexOf(colUG);
+    const marksIdx  = colMarks  ? headers.indexOf(colMarks)  : -1;
+    const resultIdx = colResult ? headers.indexOf(colResult) : -1;
+
+    const normalizeUG = (v) => String(v || "").trim().toUpperCase().replace(/\s+/g, "");
+
+    // build Excel map
+    const xlMap = {};
+    excelRows.forEach((row) => {
+      const ug = normalizeUG(row[ugIdx]);
+      if (!ug) return;
+      const rawMarks  = marksIdx  >= 0 ? row[marksIdx]  : null;
+      const rawResult = resultIdx >= 0 ? String(row[resultIdx] || "").trim().toUpperCase() : null;
+      xlMap[ug] = {
+        xl_marks:  rawMarks !== null && rawMarks !== "" ? parseFloat(rawMarks) : null,
+        xl_result: rawResult,
+      };
+    });
+
+    // build system map
+    const sysMap = {};
+    systemResults.forEach((r) => {
+      const student = studentMap[r.student];
+      if (!student) return;
+      const ug = normalizeUG(student.ug_number);
+      if (!ug) return;
+      sysMap[ug] = {
+        student_name: r.student_name || student.name,
+        sys_marks: r.final_exam,
+        sys_pass:  r.is_pass,
+      };
+    });
+
+    const rows = [];
+
+    // ① every Excel record vs system
+    Object.entries(xlMap).forEach(([ug, xl]) => {
+      const sys = sysMap[ug];
+      if (!sys) {
+        rows.push({ ug, student_name: "—", status: "missing_sys",
+          sys_marks: null, sys_pass: null, xl_marks: xl.xl_marks, xl_result: xl.xl_result,
+          issues: ["Not found in system"] });
+        return;
+      }
+      const issues = [];
+      if (xl.xl_marks !== null && !isNaN(xl.xl_marks)) {
+        if (Math.abs(xl.xl_marks - sys.sys_marks) > 0.5)
+          issues.push(`Marks: system ${sys.sys_marks} ≠ excel ${xl.xl_marks}`);
+      }
+      if (xl.xl_result) {
+        const xlPass = ["PASS","P","PASSED","Y","YES"].includes(xl.xl_result);
+        const xlFail = ["FAIL","F","FAILED","N","NO"].includes(xl.xl_result);
+        if (xlPass && !sys.sys_pass) issues.push("Result: system FAIL ≠ excel PASS");
+        else if (xlFail && sys.sys_pass) issues.push("Result: system PASS ≠ excel FAIL");
+      }
+      rows.push({ ug, student_name: sys.student_name,
+        status: issues.length > 0 ? "mismatch" : "matched",
+        sys_marks: sys.sys_marks, sys_pass: sys.sys_pass,
+        xl_marks: xl.xl_marks, xl_result: xl.xl_result, issues });
+    });
+
+    // ② system records absent from Excel
+    Object.entries(sysMap).forEach(([ug, sys]) => {
+      if (!xlMap[ug]) {
+        rows.push({ ug, student_name: sys.student_name, status: "missing_xl",
+          sys_marks: sys.sys_marks, sys_pass: sys.sys_pass,
+          xl_marks: null, xl_result: null, issues: ["Not present in uploaded Excel"] });
+      }
+    });
+
+    setComparison(rows);
+    setFilterMode("all");
+    setSearchTerm("");
+    setStep(3);
+  };
+
+  // ── reset ──────────────────────────────────────────────────────────────────
+  const reset = () => {
+    setStep(1); setSelectedBatch(""); setSystemResults([]);
+    setFileName(""); setExcelRows([]); setHeaders([]);
+    setColUG(""); setColMarks(""); setColResult("");
+    setComparison(null); setFilterMode("all"); setSearchTerm("");
+  };
+
+  // ── derived stats ──────────────────────────────────────────────────────────
+  const stats = useMemo(() => {
+    if (!comparison) return null;
+    return {
+      total:       comparison.length,
+      matched:     comparison.filter((r) => r.status === "matched").length,
+      mismatch:    comparison.filter((r) => r.status === "mismatch").length,
+      missing_sys: comparison.filter((r) => r.status === "missing_sys").length,
+      missing_xl:  comparison.filter((r) => r.status === "missing_xl").length,
+    };
+  }, [comparison]);
+
+  const visibleRows = useMemo(() => {
+    if (!comparison) return [];
+    const q = searchTerm.trim().toLowerCase();
+    return comparison.filter((r) => {
+      if (filterMode !== "all" && r.status !== filterMode) return false;
+      if (q) return r.ug.toLowerCase().includes(q) || r.student_name.toLowerCase().includes(q);
+      return true;
+    });
+  }, [comparison, filterMode, searchTerm]);
+
+  // ── helpers ────────────────────────────────────────────────────────────────
+  const statusBadge = (status) => {
+    const map = {
+      matched:     ["bg-success",           "Matched"],
+      mismatch:    ["bg-danger",            "Mismatch"],
+      missing_sys: ["bg-warning text-dark", "Missing in System"],
+      missing_xl:  ["bg-secondary",         "Not in Excel"],
+    };
+    const [cls, label] = map[status] || ["bg-light text-dark", status];
+    return <span className={`badge ${cls}`}>{label}</span>;
+  };
+
+  const rowClass = (s) => {
+    if (s === "mismatch")    return "table-danger";
+    if (s === "missing_sys") return "table-warning";
+    if (s === "missing_xl")  return "table-light";
+    return "";
+  };
+
+  const StepBar = () => (
+    <div className="d-flex align-items-center gap-2 flex-wrap">
+      {[["1","Select Batch"],["2","Upload & Map"],["3","Comparison"]].map(([n, label], i) => {
+        const num = parseInt(n); const active = step === num; const done = step > num;
+        return (
+          <div key={n} className="d-flex align-items-center gap-2">
+            {i > 0 && <div style={{ width: 32, height: 2, background: done ? "#198754" : "#dee2e6" }} />}
+            <div className="d-flex align-items-center gap-2">
+              <div className="d-flex align-items-center justify-content-center rounded-circle fw-bold"
+                style={{ width: 28, height: 28, fontSize: "0.8rem",
+                  background: done ? "#198754" : active ? "#0d6efd" : "#dee2e6",
+                  color: done || active ? "#fff" : "#6c757d" }}>
+                {done ? "✓" : n}
+              </div>
+              <span className={`small fw-medium ${active ? "text-primary" : done ? "text-success" : "text-muted"}`}>
+                {label}
+              </span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  const batchName = batches.find((b) => String(b.id) === selectedBatch)?.name || "";
+
+  // ── render ─────────────────────────────────────────────────────────────────
+  return (
+    <div>
+      <div className="d-flex justify-content-between align-items-center mb-4">
+        <StepBar />
+        {step > 1 && (
+          <button type="button" className="btn btn-sm btn-outline-secondary" onClick={reset}>
+            ↩ Start Over
+          </button>
+        )}
+      </div>
+
+      {/* ── Step 1: Select Batch ──────────────────────────────────── */}
+      {step === 1 && (
+        <div className="row justify-content-center">
+          <div className="col-lg-5">
+            <div className="card shadow-sm border-0">
+              <div className="card-body p-4">
+                <h5 className="mb-1">Select Batch</h5>
+                <p className="text-muted small mb-4">
+                  Choose the batch whose results you want to validate against the official Exam Admin Excel.
+                </p>
+                <div className="mb-4">
+                  <label className="form-label" htmlFor="rc-batch">Batch</label>
+                  <select id="rc-batch" className="form-select form-select-lg"
+                    value={selectedBatch} onChange={(e) => setSelectedBatch(e.target.value)}>
+                    <option value="">Choose a batch…</option>
+                    {batches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
+                </div>
+                <button type="button"
+                  className="btn btn-primary btn-lg w-100 d-flex justify-content-center align-items-center gap-2"
+                  onClick={loadSystemResults}
+                  disabled={!selectedBatch || isLoadingResults}>
+                  {isLoadingResults
+                    ? <><span className="spinner-border spinner-border-sm" aria-hidden="true" /> Loading…</>
+                    : "Load System Results →"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Step 2: Upload Excel & Map Columns ───────────────────── */}
+      {step === 2 && (
+        <div className="row g-4">
+          {/* System results preview */}
+          <div className="col-lg-4">
+            <div className="card shadow-sm border-0 h-100">
+              <div className="card-body p-4">
+                <div className="d-flex align-items-center gap-2 mb-2">
+                  <span className="badge bg-primary rounded-pill" style={{ fontSize: "1rem" }}>
+                    {systemResults.length}
+                  </span>
+                  <h6 className="mb-0">System Records</h6>
+                </div>
+                <p className="text-muted small mb-3">Batch: <strong>{batchName}</strong></p>
+                <div className="border rounded p-2" style={{ maxHeight: 320, overflowY: "auto", fontSize: "0.78rem" }}>
+                  {systemResults.length === 0
+                    ? <p className="text-muted mb-0">No results found.</p>
+                    : systemResults.map((r) => {
+                        const s = studentMap[r.student];
+                        return (
+                          <div key={r.id} className="d-flex justify-content-between align-items-center py-1 border-bottom gap-2">
+                            <span className="text-muted font-monospace" style={{ minWidth: 80 }}>{s?.ug_number || "—"}</span>
+                            <span className="flex-grow-1">{r.student_name || s?.name || "—"}</span>
+                            <span className={`badge ${r.is_pass ? "bg-success" : "bg-danger"}`}>
+                              {r.is_pass ? "PASS" : "FAIL"}
+                            </span>
+                          </div>
+                        );
+                      })}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Upload + column mapping */}
+          <div className="col-lg-8">
+            <div className="card shadow-sm border-0">
+              <div className="card-body p-4">
+                <h5 className="mb-1">Upload Exam Admin Excel</h5>
+                <p className="text-muted small mb-4">
+                  Upload the official Excel sheet. The first sheet is used. Columns are auto-detected — review before running.
+                </p>
+
+                {/* Drop zone */}
+                <label htmlFor="rc-file"
+                  className="d-block rounded p-4 text-center mb-4"
+                  style={{ border: "2px dashed #0d6efd", cursor: "pointer" }}>
+                  <div style={{ fontSize: "2rem" }}>📂</div>
+                  <div className="fw-medium text-primary">Click to upload Excel file</div>
+                  <div className="text-muted small">.xlsx or .xls — first sheet used</div>
+                  {fileName && (
+                    <div className="mt-2">
+                      <span className="badge bg-success">{fileName}</span>
+                      <span className="ms-2 text-muted small">{excelRows.length} data rows detected</span>
+                    </div>
+                  )}
+                </label>
+                <input id="rc-file" type="file" accept=".xlsx,.xls"
+                  className="visually-hidden" onChange={handleFileUpload} />
+
+                {/* Column mapping */}
+                {headers.length > 0 && (
+                  <>
+                    <div className="alert alert-info py-2 mb-3" style={{ fontSize: "0.85rem" }}>
+                      <strong>Review column mapping below.</strong> UG Number is required. Marks and Result columns are compared.
+                    </div>
+
+                    <div className="row g-3 mb-4">
+                      {[
+                        { label: "UG Number column", req: true,  val: colUG,     set: setColUG,     icon: "🔑" },
+                        { label: "Marks column",      req: false, val: colMarks,  set: setColMarks,  icon: "📊" },
+                        { label: "Result column",     req: false, val: colResult, set: setColResult, icon: "✅" },
+                      ].map(({ label, req, val, set, icon }) => (
+                        <div className="col-sm-4" key={label}>
+                          <label className="form-label fw-medium">
+                            {icon} {label} {req && <span className="text-danger">*</span>}
+                          </label>
+                          <select className="form-select" value={val} onChange={(e) => set(e.target.value)}>
+                            <option value="">— not selected —</option>
+                            {headers.map((h) => <option key={h} value={h}>{h}</option>)}
+                          </select>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Preview */}
+                    <div className="mb-4">
+                      <p className="text-muted small mb-2">Preview — first 5 rows (mapped columns highlighted):</p>
+                      <div className="table-responsive border rounded" style={{ maxHeight: 200, overflowY: "auto" }}>
+                        <table className="table table-sm mb-0" style={{ fontSize: "0.78rem" }}>
+                          <thead className="table-light sticky-top">
+                            <tr>
+                              {headers.map((h) => (
+                                <th key={h} className={
+                                  h === colUG ? "text-primary" : h === colMarks ? "text-success" : h === colResult ? "text-warning" : "text-muted"
+                                }>
+                                  {h}{h === colUG ? " 🔑" : h === colMarks ? " 📊" : h === colResult ? " ✅" : ""}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {excelRows.slice(0, 5).map((row, i) => (
+                              <tr key={i}>
+                                {headers.map((h, hi) => (
+                                  <td key={hi}>{String(row[hi] ?? "")}</td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <button type="button" className="btn btn-success btn-lg" onClick={runComparison} disabled={!colUG}>
+                      Run Comparison →
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Step 3: Comparison Results ────────────────────────────── */}
+      {step === 3 && comparison && stats && (
+        <div>
+          {/* Summary cards */}
+          <div className="row g-3 mb-4">
+            {[
+              { label: "Total",             value: stats.total,       cls: "text-primary",  border: "border-primary"   },
+              { label: "Matched",           value: stats.matched,     cls: "text-success",  border: "border-success"   },
+              { label: "Mismatches",        value: stats.mismatch,    cls: "text-danger",   border: "border-danger"    },
+              { label: "Missing in System", value: stats.missing_sys, cls: "text-warning",  border: "border-warning"   },
+              { label: "Not in Excel",      value: stats.missing_xl,  cls: "text-secondary",border: "border-secondary" },
+            ].map(({ label, value, cls, border }) => (
+              <div className="col" key={label}>
+                <div className={`card shadow-sm border-2 text-center p-3 ${border}`}>
+                  <div className={`fw-bold fs-2 ${cls}`}>{value}</div>
+                  <div className="text-muted small">{label}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Alert banner */}
+          {(stats.mismatch > 0 || stats.missing_sys > 0) ? (
+            <div className="alert alert-danger d-flex gap-2 align-items-start mb-4">
+              <span style={{ fontSize: "1.3rem" }}>⚠️</span>
+              <div>
+                <strong>Action required — </strong>
+                {stats.mismatch > 0 && `${stats.mismatch} record(s) have marks or result discrepancies. `}
+                {stats.missing_sys > 0 && `${stats.missing_sys} record(s) from the official Excel are missing in the system. `}
+                Please review and correct the system data accordingly.
+              </div>
+            </div>
+          ) : (
+            <div className="alert alert-success d-flex gap-2 align-items-center mb-4">
+              <span style={{ fontSize: "1.3rem" }}>✅</span>
+              <div><strong>All clear!</strong> System data matches the official Exam Admin Excel for all compared records.</div>
+            </div>
+          )}
+
+          {/* Filters */}
+          <div className="card shadow-sm border-0 mb-3">
+            <div className="card-body p-3">
+              <div className="row g-3 align-items-center flex-wrap">
+                <div className="col-auto">
+                  <div className="btn-group btn-group-sm" role="group">
+                    {[
+                      ["all",        "All",                "secondary"],
+                      ["mismatch",   "Mismatches",         "danger"   ],
+                      ["missing_sys","Missing in System",  "warning"  ],
+                      ["missing_xl", "Not in Excel",       "secondary"],
+                      ["matched",    "Matched",            "success"  ],
+                    ].map(([key, label, color]) => (
+                      <button key={key} type="button"
+                        className={`btn btn-${filterMode === key ? "" : "outline-"}${color}`}
+                        onClick={() => setFilterMode(key)}>
+                        {label}
+                        {key !== "all" && (
+                          <span className={`ms-1 badge ${filterMode === key ? "bg-white text-dark" : "bg-light text-dark"}`}
+                            style={{ fontSize: "0.7rem" }}>
+                            {key === "mismatch" ? stats.mismatch : key === "missing_sys" ? stats.missing_sys : key === "missing_xl" ? stats.missing_xl : stats.matched}
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="col-sm-4">
+                  <input type="search" className="form-control form-control-sm"
+                    placeholder="Search UG Number or name…"
+                    value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                </div>
+                <div className="col-auto ms-auto text-muted small">
+                  {visibleRows.length} of {comparison.length} · Batch: <strong>{batchName}</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Table */}
+          <div className="card shadow-sm border-0">
+            <div className="card-body p-0">
+              <div className="table-responsive">
+                <table className="table table-hover align-middle mb-0" style={{ fontSize: "0.85rem" }}>
+                  <thead className="table-light">
+                    <tr>
+                      <th>#</th>
+                      <th>UG Number</th>
+                      <th>Student</th>
+                      <th>System Marks<br /><span className="fw-normal text-muted small">/1000</span></th>
+                      <th>Excel Marks<br /><span className="fw-normal text-muted small">/1000</span></th>
+                      <th>System Result</th>
+                      <th>Excel Result</th>
+                      <th>Status</th>
+                      <th>Issues</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibleRows.length === 0
+                      ? <tr><td colSpan={9} className="text-center text-muted py-4">No records match the current filter.</td></tr>
+                      : visibleRows.map((r, idx) => {
+                          const marksDiffer = r.xl_marks !== null && r.sys_marks !== null && Math.abs(r.xl_marks - r.sys_marks) > 0.5;
+                          return (
+                            <tr key={r.ug} className={rowClass(r.status)}>
+                              <td className="text-muted">{idx + 1}</td>
+                              <td className="fw-medium font-monospace">{r.ug}</td>
+                              <td>{r.student_name}</td>
+                              <td>
+                                {r.sys_marks !== null
+                                  ? <span className={marksDiffer ? "text-danger fw-bold" : ""}>{r.sys_marks}</span>
+                                  : <span className="text-muted">—</span>}
+                              </td>
+                              <td>
+                                {r.xl_marks !== null
+                                  ? <span className={marksDiffer ? "text-danger fw-bold" : ""}>{r.xl_marks}</span>
+                                  : <span className="text-muted">—</span>}
+                              </td>
+                              <td>
+                                {r.sys_pass !== null
+                                  ? <span className={`badge ${r.sys_pass ? "bg-success" : "bg-danger"}`}>{r.sys_pass ? "PASS" : "FAIL"}</span>
+                                  : <span className="text-muted">—</span>}
+                              </td>
+                              <td>
+                                {r.xl_result
+                                  ? <span className="badge bg-secondary">{r.xl_result}</span>
+                                  : <span className="text-muted">—</span>}
+                              </td>
+                              <td>{statusBadge(r.status)}</td>
+                              <td>
+                                {r.issues.length > 0
+                                  ? <ul className="mb-0 ps-3" style={{ fontSize: "0.78rem" }}>
+                                      {r.issues.map((iss, i) => <li key={i} className="text-danger fw-medium">{iss}</li>)}
+                                    </ul>
+                                  : <span className="text-success small">✓ Match</span>}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Final Exam eligibility list (Manager + Trainer)
 // ---------------------------------------------------------------------------
 function FinalExamList({ batches, students }) {
@@ -666,6 +1228,7 @@ function ResultsPage() {
   const tabs = [
     { key: "marks",       label: "Student Marks" },
     { key: "final-exam",  label: "Final Exam List" },
+    { key: "checker",     label: "Result Checker" },
   ];
 
   return (
@@ -717,6 +1280,9 @@ function ResultsPage() {
       )}
       {activeTab === "final-exam" && (
         <FinalExamList batches={batches} students={students} />
+      )}
+      {activeTab === "checker" && (
+        <ResultChecker batches={batches} students={students} />
       )}
     </>
   );
