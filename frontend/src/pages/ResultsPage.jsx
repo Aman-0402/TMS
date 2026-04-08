@@ -639,6 +639,7 @@ function ResultChecker({ batches, students }) {
   const [excelRows, setExcelRows] = useState([]);
   const [headers, setHeaders]     = useState([]);
   const [colUG, setColUG]         = useState("");
+  const [colName, setColName]     = useState("");
   const [colMarks, setColMarks]   = useState("");
   const [colResult, setColResult] = useState("");
 
@@ -678,10 +679,15 @@ function ResultChecker({ batches, students }) {
     };
     return {
       ug:     find(["ug", "reg", "roll", "regno", "student id"]),
+      name:   find(["student name", "name", "candidate", "applicant"]),
       marks:  find(["marks", "score", "obtain", "total", "exam mark", "final"]),
       result: find(["result", "status", "pass", "fail"]),
     };
   };
+
+  // Normalise a name for comparison: lowercase, sort tokens so "Smith John" == "John Smith"
+  const normaliseName = (name) =>
+    String(name || "").toLowerCase().trim().split(/\s+/).filter(Boolean).sort().join(" ");
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
@@ -706,7 +712,7 @@ function ResultChecker({ batches, students }) {
         setHeaders(hdrs);
         setExcelRows(rows);
         const det = autoDetect(hdrs);
-        setColUG(det.ug); setColMarks(det.marks); setColResult(det.result);
+        setColUG(det.ug); setColName(det.name); setColMarks(det.marks); setColResult(det.result);
       } catch {
         toast.error("Failed to read Excel file. Please check the file format.");
       }
@@ -719,6 +725,7 @@ function ResultChecker({ batches, students }) {
     if (!colUG) { toast.error("Please select the UG Number column."); return; }
 
     const ugIdx     = headers.indexOf(colUG);
+    const nameIdx   = colName   ? headers.indexOf(colName)   : -1;
     const marksIdx  = colMarks  ? headers.indexOf(colMarks)  : -1;
     const resultIdx = colResult ? headers.indexOf(colResult) : -1;
 
@@ -731,7 +738,9 @@ function ResultChecker({ batches, students }) {
       if (!ug) return;
       const rawMarks  = marksIdx  >= 0 ? row[marksIdx]  : null;
       const rawResult = resultIdx >= 0 ? String(row[resultIdx] || "").trim().toUpperCase() : null;
+      const rawName   = nameIdx   >= 0 ? String(row[nameIdx] || "").trim()                : null;
       xlMap[ug] = {
+        xl_name:   rawName,
         xl_marks:  rawMarks !== null && rawMarks !== "" ? parseFloat(rawMarks) : null,
         xl_result: rawResult,
       };
@@ -763,17 +772,31 @@ function ResultChecker({ batches, students }) {
         return;
       }
       const issues = [];
+
+      // Compare name (token-sort so "Smith John" == "John Smith")
+      if (xl.xl_name && sys.student_name) {
+        const sysNorm = normaliseName(sys.student_name);
+        const xlNorm  = normaliseName(xl.xl_name);
+        if (sysNorm !== xlNorm) {
+          issues.push(`Name: system "${sys.student_name}" ≠ excel "${xl.xl_name}"`);
+        }
+      }
+
+      // Compare marks (±0.5 tolerance for rounding)
       if (xl.xl_marks !== null && !isNaN(xl.xl_marks)) {
         if (Math.abs(xl.xl_marks - sys.sys_marks) > 0.5)
           issues.push(`Marks: system ${sys.sys_marks} ≠ excel ${xl.xl_marks}`);
       }
+
+      // Compare pass/fail
       if (xl.xl_result) {
         const xlPass = ["PASS","P","PASSED","Y","YES"].includes(xl.xl_result);
         const xlFail = ["FAIL","F","FAILED","N","NO"].includes(xl.xl_result);
         if (xlPass && !sys.sys_pass) issues.push("Result: system FAIL ≠ excel PASS");
         else if (xlFail && sys.sys_pass) issues.push("Result: system PASS ≠ excel FAIL");
       }
-      rows.push({ ug, student_name: sys.student_name,
+
+      rows.push({ ug, student_name: sys.student_name, xl_name: xl.xl_name,
         status: issues.length > 0 ? "mismatch" : "matched",
         sys_marks: sys.sys_marks, sys_pass: sys.sys_pass,
         xl_marks: xl.xl_marks, xl_result: xl.xl_result, issues });
@@ -983,6 +1006,7 @@ function ResultChecker({ batches, students }) {
                     <div className="row g-3 mb-4">
                       {[
                         { label: "UG Number column", req: true,  val: colUG,     set: setColUG,     icon: "🔑" },
+                        { label: "Name column",       req: false, val: colName,   set: setColName,   icon: "👤" },
                         { label: "Marks column",      req: false, val: colMarks,  set: setColMarks,  icon: "📊" },
                         { label: "Result column",     req: false, val: colResult, set: setColResult, icon: "✅" },
                       ].map(({ label, req, val, set, icon }) => (
@@ -1007,9 +1031,9 @@ function ResultChecker({ batches, students }) {
                             <tr>
                               {headers.map((h) => (
                                 <th key={h} className={
-                                  h === colUG ? "text-primary" : h === colMarks ? "text-success" : h === colResult ? "text-warning" : "text-muted"
+                                  h === colUG ? "text-primary" : h === colName ? "text-info" : h === colMarks ? "text-success" : h === colResult ? "text-warning" : "text-muted"
                                 }>
-                                  {h}{h === colUG ? " 🔑" : h === colMarks ? " 📊" : h === colResult ? " ✅" : ""}
+                                  {h}{h === colUG ? " 🔑" : h === colName ? " 👤" : h === colMarks ? " 📊" : h === colResult ? " ✅" : ""}
                                 </th>
                               ))}
                             </tr>
@@ -1125,7 +1149,8 @@ function ResultChecker({ batches, students }) {
                     <tr>
                       <th>#</th>
                       <th>UG Number</th>
-                      <th>Student</th>
+                      <th>System Name</th>
+                      <th>Excel Name</th>
                       <th>System Marks<br /><span className="fw-normal text-muted small">/1000</span></th>
                       <th>Excel Marks<br /><span className="fw-normal text-muted small">/1000</span></th>
                       <th>System Result</th>
@@ -1144,6 +1169,15 @@ function ResultChecker({ batches, students }) {
                               <td className="text-muted">{idx + 1}</td>
                               <td className="fw-medium font-monospace">{r.ug}</td>
                               <td>{r.student_name}</td>
+                              <td>
+                                {r.xl_name
+                                  ? (() => {
+                                      const nameDiffer = r.student_name && r.xl_name &&
+                                        normaliseName(r.student_name) !== normaliseName(r.xl_name);
+                                      return <span className={nameDiffer ? "text-danger fw-bold" : "text-muted"}>{r.xl_name}</span>;
+                                    })()
+                                  : <span className="text-muted">—</span>}
+                              </td>
                               <td>
                                 {r.sys_marks !== null
                                   ? <span className={marksDiffer ? "text-danger fw-bold" : ""}>{r.sys_marks}</span>
