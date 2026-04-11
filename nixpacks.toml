@@ -1,8 +1,13 @@
 [phases.setup]
-nixPkgs = ["python311", "python311Packages.pip"]
+nixPkgs = ["python311"]
 
 [phases.install]
-cmds = ["cd tms && pip install -r requirements.txt"]
+cmds = [
+  "python -m venv /opt/venv",
+  ". /opt/venv/bin/activate",
+  "pip install --upgrade pip",
+  "pip install -r tms/requirements.txt"
+]
 
 [start]
-cmd = "cd tms && gunicorn tms.wsgi"
+cmd = ". /opt/venv/bin/activate && cd tms && gunicorn tms.wsgi"
