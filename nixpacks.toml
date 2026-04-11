@@ -4,10 +4,9 @@ nixPkgs = ["python311"]
 [phases.install]
 cmds = [
   "python -m venv /opt/venv",
-  ". /opt/venv/bin/activate",
-  "pip install --upgrade pip",
-  "pip install -r tms/requirements.txt"
+  "/opt/venv/bin/pip install --upgrade pip",
+  "/opt/venv/bin/pip install -r tms/requirements.txt"
 ]
 
 [start]
-cmd = ". /opt/venv/bin/activate && cd tms && gunicorn tms.wsgi"
+cmd = "cd tms && /opt/venv/bin/gunicorn tms.wsgi"
