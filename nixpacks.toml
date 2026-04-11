@@ -12,4 +12,4 @@ cmds = [
 cmds = [] 
 
 [start]
-cmd = "cd tms && /opt/venv/bin/gunicorn tms.wsgi"
+cmd = "bash start.sh"
