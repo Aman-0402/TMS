@@ -3,7 +3,7 @@ import axios from "axios";
 import { ACCESS_TOKEN_KEY, clearStoredAuth } from "../auth/storage";
 
 const API = axios.create({
-  baseURL: "https://tms.up.railway.app",
+  baseURL: "https://tms.up.railway.app/api",
 });
 
 API.interceptors.request.use((req) => {
