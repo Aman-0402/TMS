@@ -1,5 +1,6 @@
 
 
+import os
 from pathlib import Path
 from datetime import timedelta
 
@@ -51,7 +52,6 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
-CORS_ALLOW_ALL_ORIGINS = True
 
 ROOT_URLCONF = 'tms.urls'
 
@@ -139,6 +139,11 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:5173',
     'http://127.0.0.1:5173',
+    'https://tmsethnotec.netlify.app',
+]
+
+CSRF_TRUSTED_ORIGINS = [
+    'https://tmsethnotec.netlify.app',
 ]
 
 REST_FRAMEWORK = {
