@@ -8,7 +8,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # ================= SECURITY =================
 SECRET_KEY = 'django-insecure-ds!)*!uhqyrz1-4mc=@!6t#87(2m4gfp1@cci$oqzu_o4ds=mh'
 
-DEBUG = True  # change to False later
+# Set DEBUG based on environment (False in production for Railway)
+DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 
 ALLOWED_HOSTS = ['*']
 
@@ -37,7 +38,8 @@ INSTALLED_APPS = [
 
 # ================= MIDDLEWARE =================
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',  # 🔥 MUST BE FIRST
+    'tms.cors_middleware.CustomCORSMiddleware',  # 🔥 CUSTOM CORS FIRST (for preflight)
+    'corsheaders.middleware.CorsMiddleware',     # django-cors-headers (backup)
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
