@@ -22,10 +22,11 @@ from .serializers import (
 
 class CustomLoginView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
+    permission_classes = [permissions.AllowAny]
 
     def options(self, request, *args, **kwargs):
-        """Allow OPTIONS preflight requests - middleware will add CORS headers"""
-        return Response(status=status.HTTP_200_OK)
+        """Allow OPTIONS preflight requests - middleware handles CORS headers"""
+        return Response({"detail": "OK"}, status=200)
 
     def post(self, request, *args, **kwargs):
         username = request.data.get("username")
@@ -50,8 +51,8 @@ class RegisterView(generics.CreateAPIView):
     permission_classes = [permissions.AllowAny]
 
     def options(self, request, *args, **kwargs):
-        """Allow OPTIONS preflight requests - middleware will add CORS headers"""
-        return Response(status=status.HTTP_200_OK)
+        """Allow OPTIONS preflight requests - middleware handles CORS headers"""
+        return Response({"detail": "OK"}, status=200)
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
