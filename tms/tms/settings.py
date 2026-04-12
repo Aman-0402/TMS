@@ -71,11 +71,11 @@ WSGI_APPLICATION = 'tms.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'railway',
-        'USER': 'root',
-        'PASSWORD': 'QSEbUmlocAzhnysEFufySixPcLwYDStv',
-        'HOST': 'mysql.railway.internal',
-        'PORT': '3306',
+        'NAME': os.getenv('MYSQLDATABASE', 'tms'),
+        'USER': os.getenv('MYSQLUSER', 'root'),
+        'PASSWORD': os.getenv('MYSQLPASSWORD', ''),
+        'HOST': os.getenv('MYSQLHOST', 'localhost'),
+        'PORT': os.getenv('MYSQLPORT', '3306'),
         'OPTIONS': {
             'charset': 'utf8mb4',
         },
