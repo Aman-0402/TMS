@@ -1,21 +1,21 @@
 """
-URL configuration for tms project.
-
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/5.0/topics/http/urls/
+Main URL configuration for TMS project.
+Routes all API endpoints and admin panel.
 """
 from django.contrib import admin
 from django.urls import include, path
 
 urlpatterns = [
+    # Django Admin
     path('admin/', admin.site.urls),
 
-    # API routes - accounts app (authentication, users, etc.)
+    # ==================== API ENDPOINTS ====================
+    # Accounts (authentication, users, etc.) - MUST BE FIRST
     path('api/', include('accounts.urls')),
 
-    # API routes - students app
+    # Students app
     path('api/', include('students.urls')),
 
-    # API routes - other apps
+    # Other apps
     path('api/', include('tms.api_urls')),
 ]
