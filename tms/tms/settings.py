@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 from datetime import timedelta
+from corsheaders.defaults import default_headers
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -129,9 +130,9 @@ CORS_ALLOW_CREDENTIALS = True
 
 CORS_ALLOW_ALL_HEADERS = True
 
-CORS_ALLOW_HEADERS = [
+
+CORS_ALLOW_HEADERS = list(default_headers) + [
     "authorization",
-    "content-type",
 ]
 
 CORS_ALLOW_METHODS = [
@@ -147,4 +148,5 @@ CSRF_TRUSTED_ORIGINS = [
     "https://tms-gules-iota.vercel.app",
 ]
 
-DEBUG = True
+CORS_PREFLIGHT_MAX_AGE = 86400
+CORS_EXPOSE_HEADERS = ["Content-Type", "Authorization"]
