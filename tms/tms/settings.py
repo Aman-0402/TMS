@@ -117,6 +117,8 @@ SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(hours=5),
 }
 # ================= CORS CONFIG (FINAL FIX) =================
+CORS_ALLOW_ALL_ORIGINS = True
+
 CORS_ALLOWED_ORIGINS = [
     "https://tms-gules-iota.vercel.app",  # ✅ Vercel frontend
     "http://localhost:5173",
@@ -124,6 +126,8 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 CORS_ALLOW_CREDENTIALS = True
+
+CORS_ALLOW_ALL_HEADERS = True
 
 CORS_ALLOW_HEADERS = [
     "authorization",
