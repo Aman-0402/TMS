@@ -16,7 +16,6 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import include, path
-from django.http import HttpResponse
 from rest_framework_simplejwt.views import TokenRefreshView
 
 from accounts.views import (
@@ -29,20 +28,6 @@ from accounts.views import (
     RegisterView,
     RejectUserView,
 )
-
-
-class CORSTokenRefreshView(TokenRefreshView):
-    """TokenRefreshView with explicit CORS handling"""
-
-    def options(self, request, *args, **kwargs):
-        """Handle CORS preflight"""
-        response = HttpResponse()
-        response['Access-Control-Allow-Origin'] = request.META.get('HTTP_ORIGIN', '*')
-        response['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
-        response['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
-        response['Access-Control-Max-Age'] = '86400'
-        response['Access-Control-Allow-Credentials'] = 'true'
-        return response
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -57,5 +42,5 @@ urlpatterns = [
     path('api/users/', AdminUserListView.as_view()),
     path('api/users/<int:pk>/', AdminUserDetailView.as_view()),
     path('api/token/', CustomLoginView.as_view()),
-    path('api/token/refresh/', CORSTokenRefreshView.as_view()),
+    path('api/token/refresh/', TokenRefreshView.as_view()),
 ]

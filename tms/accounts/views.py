@@ -1,5 +1,4 @@
 from django.db.models import Q
-from django.http import HttpResponse
 from rest_framework import generics, permissions, status, viewsets
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
@@ -24,19 +23,6 @@ from .serializers import (
 class CustomLoginView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
 
-    def options(self, request, *args, **kwargs):
-        """
-        Handle CORS preflight OPTIONS request.
-        Explicitly set CORS headers to ensure preflight passes.
-        """
-        response = HttpResponse()
-        response['Access-Control-Allow-Origin'] = request.META.get('HTTP_ORIGIN', '*')
-        response['Access-Control-Allow-Methods'] = 'GET, POST, PUT, PATCH, DELETE, OPTIONS'
-        response['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-CSRFToken'
-        response['Access-Control-Max-Age'] = '86400'
-        response['Access-Control-Allow-Credentials'] = 'true'
-        return response
-
     def post(self, request, *args, **kwargs):
         username = request.data.get("username")
         user = User.objects.filter(username=username).first()
@@ -58,19 +44,6 @@ class CustomLoginView(TokenObtainPairView):
 class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
     permission_classes = [permissions.AllowAny]
-
-    def options(self, request, *args, **kwargs):
-        """
-        Handle CORS preflight OPTIONS request.
-        Explicitly set CORS headers to ensure preflight passes.
-        """
-        response = HttpResponse()
-        response['Access-Control-Allow-Origin'] = request.META.get('HTTP_ORIGIN', '*')
-        response['Access-Control-Allow-Methods'] = 'GET, POST, PUT, PATCH, DELETE, OPTIONS'
-        response['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-CSRFToken'
-        response['Access-Control-Max-Age'] = '86400'
-        response['Access-Control-Allow-Credentials'] = 'true'
-        return response
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
