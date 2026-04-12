@@ -5,17 +5,23 @@ class AccountsConfig(AppConfig):
     name = 'accounts'
 
     def ready(self):
-        import os
         from django.contrib.auth import get_user_model
 
         User = get_user_model()
 
-        # Prevent duplicate creation
-        if not User.objects.filter(username="admin").exists():
-            print("🔥 Creating default superuser...")
+        # Get or create admin user (idempotent - safe to run multiple times)
+        user, created = User.objects.get_or_create(username="admin")
 
-            User.objects.create_superuser(
-                username="admin",
-                email="admin@gmail.com",
-                password="admin123"
-            )
+        # Update user properties
+        user.is_superuser = True
+        user.is_staff = True
+        user.is_approved = True
+        user.role = "ADMIN"  # 🔥 IMPORTANT - matches your User model
+        user.email = "admin@gmail.com"
+        user.set_password("admin123")
+        user.save()
+
+        if created:
+            print("🔥 Created default admin superuser")
+        else:
+            print("✅ Admin superuser already exists (updated)")
