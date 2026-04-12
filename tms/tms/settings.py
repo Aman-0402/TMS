@@ -116,17 +116,19 @@ REST_FRAMEWORK = {
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(hours=5),
 }
-
 # ================= CORS CONFIG (FINAL FIX) =================
 CORS_ALLOWED_ORIGINS = [
-    "https://tmsethnotec.netlify.app",
+    "https://tms-gules-iota.vercel.app",  # ✅ Vercel frontend
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
 
 CORS_ALLOW_CREDENTIALS = True
 
-CORS_ALLOW_ALL_HEADERS = True
+CORS_ALLOW_HEADERS = [
+    "authorization",
+    "content-type",
+]
 
 CORS_ALLOW_METHODS = [
     "DELETE",
@@ -138,8 +140,7 @@ CORS_ALLOW_METHODS = [
 ]
 
 CSRF_TRUSTED_ORIGINS = [
-    "https://tmsethnotec.netlify.app",
+    "https://tms-gules-iota.vercel.app",
 ]
 
-# 🔥 TEMP DEBUG (REMOVE AFTER LOGIN WORKS)
-CORS_ALLOW_ALL_ORIGINS = True
+DEBUG = True
