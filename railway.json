@@ -3,6 +3,6 @@
       "builder": "NIXPACKS"
     },
     "deploy": {
-      "startCommand": "cd tms && gunicorn tms.wsgi"
+      "startCommand": "bash start.sh"
     }
   }
