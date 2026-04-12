@@ -1,4 +1,4 @@
-import pandas as pd
+from openpyxl import load_workbook
 from django.db import transaction
 from rest_framework import viewsets
 from rest_framework.decorators import action
@@ -133,23 +133,39 @@ class StudentViewSet(SoftDeleteMixin, AuditLogMixin, RoleScopedQuerysetMixin, vi
         self._validate_batch_upload_scope(batch)
 
         try:
-            dataframe = pd.read_excel(uploaded_file)
+            workbook = load_workbook(uploaded_file, data_only=True)
+            worksheet = workbook.active
         except Exception:
             return Response(
                 {"error": "Unable to read the uploaded Excel file. Please check the format and try again."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if dataframe.empty:
+        # Extract rows as list of dicts
+        rows = list(worksheet.iter_rows(values_only=True))
+
+        if not rows or len(rows) == 0:
             return Response(
                 {"error": "The uploaded Excel file is empty."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        dataframe.rename(columns=lambda column_name: str(column_name).strip(), inplace=True)
+        # Parse header row (first row)
+        header_raw = rows[0]
+        if not header_raw or all(cell is None for cell in header_raw):
+            return Response(
+                {"error": "The uploaded Excel file has no headers."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
+        # Normalize column names
+        headers = [str(cell).strip() if cell is not None else "" for cell in header_raw]
+        headers = [h for h in headers if h]  # Remove empty headers
+
+        # Check required columns
         required_columns = {"UG Number", "Name", "Department", "Lab"}
-        missing_columns = required_columns.difference(dataframe.columns)
+        header_set = set(headers)
+        missing_columns = required_columns - header_set
         if missing_columns:
             return Response(
                 {
@@ -159,11 +175,30 @@ class StudentViewSet(SoftDeleteMixin, AuditLogMixin, RoleScopedQuerysetMixin, vi
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # Convert rows to list of dicts
+        data_rows = []
+        for row in rows[1:]:
+            if all(cell is None for cell in row):
+                continue  # Skip empty rows
+            row_dict = {}
+            for i, header in enumerate(headers):
+                row_dict[header] = row[i] if i < len(row) else None
+            data_rows.append(row_dict)
+
+        if not data_rows:
+            return Response(
+                {"error": "The uploaded Excel file has no data rows."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Extract and normalize UG numbers
         normalized_ug_numbers = [
-            self._get_excel_value(row_data, "UG Number")
-            for _, row_data in dataframe.iterrows()
-            if self._get_excel_value(row_data, "UG Number")
+            self._normalize_excel_value(row.get("UG Number"))
+            for row in data_rows
+            if self._normalize_excel_value(row.get("UG Number"))
         ]
+
+        # Check for duplicates in file
         duplicate_ug_numbers_in_file = sorted(
             {
                 ug_number
@@ -194,20 +229,19 @@ class StudentViewSet(SoftDeleteMixin, AuditLogMixin, RoleScopedQuerysetMixin, vi
         }
 
         students_to_create = []
-        students_to_reenroll = []   # (student_instance, new_batch, new_lab, new_name, new_dept, new_email, new_phone)
+        students_to_reenroll = []
         created_ug_numbers = []
         same_course_duplicates = []
         processed_in_file = set()
 
         with transaction.atomic():
-            for row_number, row in enumerate(dataframe.iterrows(), start=2):
-                _, row_data = row
-                ug_number = self._get_excel_value(row_data, "UG Number")
-                name = self._get_excel_value(row_data, "Name")
-                department = self._get_excel_value(row_data, "Department")
-                lab_name = self._get_excel_value(row_data, "Lab")
-                email = self._get_excel_value(row_data, "Email")
-                phone = self._get_excel_value(row_data, "Phone")
+            for row_number, row_data in enumerate(data_rows, start=2):
+                ug_number = self._normalize_excel_value(row_data.get("UG Number"))
+                name = self._normalize_excel_value(row_data.get("Name"))
+                department = self._normalize_excel_value(row_data.get("Department"))
+                lab_name = self._normalize_excel_value(row_data.get("Lab"))
+                email = self._normalize_excel_value(row_data.get("Email"))
+                phone = self._normalize_excel_value(row_data.get("Phone"))
 
                 if not ug_number or not name or not department or not lab_name:
                     return Response(
@@ -364,10 +398,17 @@ class StudentViewSet(SoftDeleteMixin, AuditLogMixin, RoleScopedQuerysetMixin, vi
 
         return Trainer.objects.filter(batch=batch).order_by("id").first()
 
-    def _get_excel_value(self, row_data, column_name):
-        value = row_data.get(column_name, "")
-        if pd.isna(value):
+    def _normalize_excel_value(self, value):
+        """
+        Normalize Excel cell values to clean strings.
+        Handles None, NaN, floats, and whitespace.
+        """
+        if value is None:
             return ""
-        if isinstance(value, float) and value.is_integer():
-            return str(int(value))
+        # Check if it's a float that should be converted to int
+        if isinstance(value, float):
+            if value != value:  # NaN check (NaN != NaN)
+                return ""
+            if value.is_integer():
+                return str(int(value))
         return str(value).strip()
