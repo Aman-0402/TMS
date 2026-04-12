@@ -77,6 +77,7 @@ class AvailableTrainerUserSerializer(serializers.ModelSerializer):
     trainer_profile_id = serializers.SerializerMethodField()
     current_batch = serializers.SerializerMethodField()
     current_batch_name = serializers.SerializerMethodField()
+    current_lab_id = serializers.SerializerMethodField()
     assigned_lab_names = serializers.SerializerMethodField()
 
     class Meta:
@@ -89,6 +90,7 @@ class AvailableTrainerUserSerializer(serializers.ModelSerializer):
             "trainer_profile_id",
             "current_batch",
             "current_batch_name",
+            "current_lab_id",
             "assigned_lab_names",
         )
         read_only_fields = fields
@@ -111,12 +113,19 @@ class AvailableTrainerUserSerializer(serializers.ModelSerializer):
         trainer = self._get_trainer_profile(obj)
         return trainer.batch.name if trainer else ""
 
+    def get_current_lab_id(self, obj):
+        trainer = self._get_trainer_profile(obj)
+        if not trainer:
+            return None
+
+        return trainer.labs.order_by("created_at", "name", "id").values_list("id", flat=True).first()
+
     def get_assigned_lab_names(self, obj):
         trainer = self._get_trainer_profile(obj)
         if not trainer:
             return []
 
-        return list(trainer.labs.order_by("name").values_list("name", flat=True))
+        return list(trainer.labs.order_by("created_at", "name", "id").values_list("name", flat=True))
 
 
 class AvailableManagerUserSerializer(serializers.ModelSerializer):

@@ -21,4 +21,9 @@ class LabViewSet(AuditLogMixin, RoleScopedQuerysetMixin, viewsets.ModelViewSet):
         return [IsAuthenticated()]
 
     def get_base_queryset(self):
-        return Lab.objects.select_related("batch", "trainer", "trainer__user").order_by("name")
+        return Lab.objects.select_related("batch", "trainer", "trainer__user").order_by(
+            "batch__name",
+            "created_at",
+            "name",
+            "id",
+        )

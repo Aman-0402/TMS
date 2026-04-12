@@ -53,9 +53,9 @@ class TrainerAssignmentAPITests(APITestCase):
         response = self.client.post(
             reverse("trainer-list"),
             {
-                "user": self.trainer_user.id,
-                "batch": self.batch.id,
-                "lab": self.lab.id,
+                "trainer_id": self.trainer_user.id,
+                "batch_id": self.batch.id,
+                "lab_id": self.lab.id,
             },
             format="json",
         )
@@ -64,6 +64,7 @@ class TrainerAssignmentAPITests(APITestCase):
         self.assertEqual(response.data["message"], "Trainer assigned successfully.")
         self.assertEqual(response.data["data"]["user"], self.trainer_user.id)
         self.assertEqual(response.data["data"]["batch"], self.batch.id)
+        self.assertEqual(response.data["data"]["current_lab_id"], self.lab.id)
         self.assertEqual(response.data["data"]["assigned_lab_names"], ["Lab 101"])
 
         trainer = Trainer.objects.get(user=self.trainer_user)
@@ -80,15 +81,16 @@ class TrainerAssignmentAPITests(APITestCase):
         response = self.client.put(
             reverse("trainer-detail", args=[trainer.id]),
             {
-                "user": self.trainer_user.id,
-                "batch": self.batch.id,
-                "lab": new_lab.id,
+                "trainer_id": self.trainer_user.id,
+                "batch_id": self.batch.id,
+                "lab_id": new_lab.id,
             },
             format="json",
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["message"], "Trainer assignment updated successfully.")
+        self.assertEqual(response.data["data"]["current_lab_id"], new_lab.id)
         self.assertEqual(response.data["data"]["assigned_lab_names"], ["Lab 102"])
 
         trainer.refresh_from_db()
@@ -113,9 +115,9 @@ class TrainerAssignmentAPITests(APITestCase):
         response = self.client.post(
             reverse("trainer-list"),
             {
-                "user": self.trainer_user.id,
-                "batch": self.batch.id,
-                "lab": other_lab.id,
+                "trainer_id": self.trainer_user.id,
+                "batch_id": self.batch.id,
+                "lab_id": other_lab.id,
             },
             format="json",
         )

@@ -9,8 +9,8 @@ class LabSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Lab
-        fields = ("id", "name", "batch", "batch_name", "trainer", "trainer_name")
-        read_only_fields = ("id",)
+        fields = ("id", "name", "created_at", "batch", "batch_name", "trainer", "trainer_name")
+        read_only_fields = ("id", "created_at")
         extra_kwargs = {
             "trainer": {"required": False, "allow_null": True},
         }

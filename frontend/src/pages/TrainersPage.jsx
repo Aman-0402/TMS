@@ -14,6 +14,41 @@ function normalizeApiList(responseData) {
   return Array.isArray(responseData) ? responseData : responseData.results || [];
 }
 
+function getAssignmentErrorMessage(error) {
+  const responseData = error.response?.data;
+
+  console.error("[TrainersPage] Trainer assignment failed:", responseData || error);
+
+  if (!responseData) {
+    return "Unable to save trainer assignment.";
+  }
+
+  if (typeof responseData.error === "string" && responseData.error.trim()) {
+    return responseData.error;
+  }
+
+  const firstFieldError = [
+    responseData.lab,
+    responseData.lab_id,
+    responseData.batch,
+    responseData.batch_id,
+    responseData.user,
+    responseData.trainer_id,
+    responseData.non_field_errors,
+    responseData.detail,
+  ].find((value) => value);
+
+  if (Array.isArray(firstFieldError) && firstFieldError.length > 0) {
+    return firstFieldError[0];
+  }
+
+  if (typeof firstFieldError === "string" && firstFieldError.trim()) {
+    return firstFieldError;
+  }
+
+  return "Unable to save trainer assignment.";
+}
+
 function TrainersPage() {
   const [trainerUsers, setTrainerUsers] = useState([]);
   const [batches, setBatches] = useState([]);
@@ -82,7 +117,7 @@ function TrainersPage() {
     setFormData({
       user: String(trainerUser.id),
       batch: trainerUser.current_batch ? String(trainerUser.current_batch) : "",
-      lab: "",
+      lab: trainerUser.current_lab_id ? String(trainerUser.current_lab_id) : "",
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -101,10 +136,12 @@ function TrainersPage() {
 
     try {
       const payload = {
-        user: Number(formData.user),
-        batch: Number(formData.batch),
-        lab: formData.lab ? Number(formData.lab) : null,
+        trainer_id: Number(formData.user),
+        batch_id: Number(formData.batch),
+        lab_id: formData.lab ? Number(formData.lab) : null,
       };
+
+      console.log("[TrainersPage] Saving trainer assignment payload:", payload);
 
       if (editingAssignmentId) {
         await http.put(`trainers/${editingAssignmentId}/`, payload);
@@ -119,13 +156,7 @@ function TrainersPage() {
       resetForm();
       await loadData();
     } catch (requestError) {
-      setSubmitError(
-        requestError.response?.data?.lab?.[0] ||
-          requestError.response?.data?.batch?.[0] ||
-          requestError.response?.data?.detail ||
-          requestError.response?.data?.error ||
-          "Unable to save trainer assignment."
-      );
+      setSubmitError(getAssignmentErrorMessage(requestError));
     } finally {
       setIsSubmitting(false);
     }
