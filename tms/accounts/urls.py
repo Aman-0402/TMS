@@ -45,7 +45,9 @@ urlpatterns = [
     path('users/<int:pk>/', AdminUserDetailView.as_view(), name='admin-user-detail'),
 
     # ==================== AVAILABLE USERS ====================
-    path('trainers/', AvailableTrainerUserListView.as_view(), name='available-trainers'),
+    # Keep this endpoint for listing available trainer accounts, but avoid
+    # colliding with the trainer-assignment router in tms.api_urls.
+    path('available-trainers/', AvailableTrainerUserListView.as_view(), name='available-trainers'),
     path('managers-list/', AvailableManagerUserListView.as_view(), name='available-managers'),
 
     # ==================== VIEWSET ROUTES ====================
