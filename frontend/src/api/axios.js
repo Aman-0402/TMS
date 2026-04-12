@@ -1,9 +1,8 @@
 import axios from "axios";
-
 import { ACCESS_TOKEN_KEY, clearStoredAuth } from "../auth/storage";
 
 const API = axios.create({
-  baseURL: "https://tms.up.railway.app/api",
+  baseURL: import.meta.env.VITE_API_URL + "/api", // 🔥 important
 });
 
 API.interceptors.request.use((req) => {
@@ -23,7 +22,6 @@ API.interceptors.response.use(
       clearStoredAuth();
       window.location.href = "/login";
     }
-
     return Promise.reject(error);
   }
 );
