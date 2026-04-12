@@ -111,12 +111,15 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
+    'DEFAULT_RENDERER_CLASSES': (
+        'rest_framework.renderers.JSONRenderer',
+    ),
 }
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(hours=5),
 }
-# ================= CORS CONFIG (FINAL FIX) =================
+# ================= CORS CONFIG (PRODUCTION-READY) =================
 CORS_ALLOW_ALL_ORIGINS = False
 
 CORS_ALLOWED_ORIGINS = [
@@ -126,27 +129,42 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:5173",
 ]
 
+# Allow credentials (cookies, authorization headers)
 CORS_ALLOW_CREDENTIALS = True
 
+# Allow all headers (needed for JWT tokens and custom headers)
 CORS_ALLOW_ALL_HEADERS = True
 
-
+# Explicitly define headers (backup if CORS_ALLOW_ALL_HEADERS fails)
 CORS_ALLOW_HEADERS = list(default_headers) + [
     "authorization",
+    "content-type",
+    "accept",
+    "origin",
+    "user-agent",
 ]
 
+# Allow all HTTP methods including OPTIONS
 CORS_ALLOW_METHODS = [
     "DELETE",
     "GET",
+    "HEAD",
     "OPTIONS",
     "PATCH",
     "POST",
     "PUT",
 ]
 
+# CSRF configuration for trusted origins
 CSRF_TRUSTED_ORIGINS = [
     "https://tms-gules-iota.vercel.app",
+    "https://tmsethnotec.netlify.app",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
 ]
 
+# Cache preflight requests for 24 hours
 CORS_PREFLIGHT_MAX_AGE = 86400
+
+# Expose headers to frontend (needed for frontend to read them)
 CORS_EXPOSE_HEADERS = ["Content-Type", "Authorization"]
