@@ -59,6 +59,8 @@ function StudentsPage() {
   const [error, setError] = useState("");
   const [submitError, setSubmitError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [selectedBatchFilter, setSelectedBatchFilter] = useState("");
+  const [selectedTrainerFilter, setSelectedTrainerFilter] = useState("");
 
   const selectedBatchId = Number(formData.batch);
 
@@ -69,6 +71,34 @@ function StudentsPage() {
 
     return labs.filter((lab) => lab.batch === selectedBatchId);
   }, [labs, selectedBatchId]);
+
+  const trainerOptions = useMemo(() => {
+    const trainersById = new Map();
+    labs.forEach((lab) => {
+      if (lab.trainer && !trainersById.has(lab.trainer)) {
+        trainersById.set(lab.trainer, {
+          id: lab.trainer,
+          name: lab.trainer_name || `Trainer ${lab.trainer}`,
+        });
+      }
+    });
+
+    return Array.from(trainersById.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [labs]);
+
+  const filteredStudents = useMemo(() => {
+    return students.filter((student) => {
+      if (selectedBatchFilter && String(student.batch) !== selectedBatchFilter) {
+        return false;
+      }
+
+      if (selectedTrainerFilter && String(student.trainer_id) !== selectedTrainerFilter) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [selectedBatchFilter, selectedTrainerFilter, students]);
 
   const loadData = async () => {
     setError("");
@@ -233,6 +263,21 @@ function StudentsPage() {
         >
           Open Student List In New Tab
         </button>
+      </div>
+
+      <div className="row g-3 mb-4">
+        {batches.map((batch) => (
+          <div className="col-md-6 col-xl-3" key={batch.id}>
+            <div className="card shadow-sm border-0 h-100">
+              <div className="card-body">
+                <div className="text-uppercase small text-muted mb-2">Batch</div>
+                <div className="fw-semibold">{batch.name}</div>
+                <div className="display-6 fw-bold mt-2">{batch.student_count ?? 0}</div>
+                <div className="text-secondary small">Students enrolled</div>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
 
       <div className="row g-4">
@@ -433,6 +478,55 @@ function StudentsPage() {
             <div className="card-body">
               <h2 className="h5 mb-3">Students List</h2>
 
+              <div className="row g-3 mb-3">
+                <div className="col-md-4">
+                  <label className="form-label" htmlFor="students-filter-batch">Filter by Batch</label>
+                  <select
+                    id="students-filter-batch"
+                    className="form-select"
+                    value={selectedBatchFilter}
+                    onChange={(event) => setSelectedBatchFilter(event.target.value)}
+                  >
+                    <option value="">All batches</option>
+                    {batches.map((batch) => (
+                      <option key={batch.id} value={batch.id}>
+                        {batch.name} ({batch.student_count ?? 0})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="col-md-4">
+                  <label className="form-label" htmlFor="students-filter-trainer">Filter by Trainer</label>
+                  <select
+                    id="students-filter-trainer"
+                    className="form-select"
+                    value={selectedTrainerFilter}
+                    onChange={(event) => setSelectedTrainerFilter(event.target.value)}
+                  >
+                    <option value="">All trainers</option>
+                    {trainerOptions.map((trainer) => (
+                      <option key={trainer.id} value={trainer.id}>
+                        {trainer.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="col-md-4 d-flex align-items-end">
+                  <button
+                    type="button"
+                    className="btn btn-outline-secondary w-100"
+                    onClick={() => {
+                      setSelectedBatchFilter("");
+                      setSelectedTrainerFilter("");
+                    }}
+                  >
+                    Reset Filters
+                  </button>
+                </div>
+              </div>
+
               {isLoading ? (
                 <p className="mb-0 text-secondary">Loading students...</p>
               ) : null}
@@ -443,13 +537,13 @@ function StudentsPage() {
                 </div>
               ) : null}
 
-              {!isLoading && !error && students.length === 0 ? (
+              {!isLoading && !error && filteredStudents.length === 0 ? (
                 <div className="alert alert-light mb-0" role="alert">
                   No students found.
                 </div>
               ) : null}
 
-              {!isLoading && !error && students.length > 0 ? (
+              {!isLoading && !error && filteredStudents.length > 0 ? (
                 <div className="table-responsive">
                   <table className="table table-hover align-middle mb-0">
                     <thead className="table-light">
@@ -461,11 +555,12 @@ function StudentsPage() {
                         <th scope="col">Phone</th>
                         <th scope="col">Batch</th>
                         <th scope="col">Lab</th>
+                        <th scope="col">Trainer</th>
                         <th scope="col" className="text-end">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {students.map((student) => (
+                      {filteredStudents.map((student) => (
                         <tr key={student.id}>
                           <td>{student.ug_number}</td>
                           <td>{student.name}</td>
@@ -474,6 +569,7 @@ function StudentsPage() {
                           <td>{student.phone}</td>
                           <td>{student.batch_name || student.batch}</td>
                           <td>{student.lab_name || student.lab}</td>
+                          <td>{student.trainer_name || "Unassigned"}</td>
                           <td className="text-end">
                             <div className="d-inline-flex gap-2">
                               <button

@@ -1,17 +1,68 @@
 import os
 from pathlib import Path
 from datetime import timedelta
+from urllib.parse import parse_qs, unquote, urlparse
 from corsheaders.defaults import default_headers
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+
+def _get_env_list(name, default=None):
+    raw_value = os.getenv(name, "")
+    if raw_value.strip():
+        return [item.strip() for item in raw_value.split(",") if item.strip()]
+    return default[:] if default else []
+
+
+def _get_database_config():
+    database_url = os.getenv("DATABASE_URL", "").strip()
+    if database_url:
+        parsed_url = urlparse(database_url)
+        if parsed_url.scheme not in {"mysql", "mysql2"}:
+            raise ValueError("DATABASE_URL must use a MySQL scheme.")
+
+        query_params = parse_qs(parsed_url.query)
+        options = {"charset": "utf8mb4"}
+        if query_params.get("ssl-mode"):
+            options["ssl_mode"] = query_params["ssl-mode"][0]
+
+        return {
+            "ENGINE": "django.db.backends.mysql",
+            "NAME": unquote(parsed_url.path.lstrip("/")),
+            "USER": unquote(parsed_url.username or ""),
+            "PASSWORD": unquote(parsed_url.password or ""),
+            "HOST": parsed_url.hostname or "localhost",
+            "PORT": str(parsed_url.port or "3306"),
+            "OPTIONS": options,
+        }
+
+    return {
+        "ENGINE": "django.db.backends.mysql",
+        "NAME": os.getenv("MYSQLDATABASE", "tms"),
+        "USER": os.getenv("MYSQLUSER", "root"),
+        "PASSWORD": os.getenv("MYSQLPASSWORD", ""),
+        "HOST": os.getenv("MYSQLHOST", "localhost"),
+        "PORT": os.getenv("MYSQLPORT", "3306"),
+        "OPTIONS": {
+            "charset": "utf8mb4",
+        },
+    }
+
 # ================= SECURITY =================
-SECRET_KEY = 'django-insecure-ds!)*!uhqyrz1-4mc=@!6t#87(2m4gfp1@cci$oqzu_o4ds=mh'
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-ds!)*!uhqyrz1-4mc=@!6t#87(2m4gfp1@cci$oqzu_o4ds=mh')
 
 # Set DEBUG based on environment (False in production for Railway)
 DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = _get_env_list(
+    "ALLOWED_HOSTS",
+    [
+        ".railway.app",
+        ".up.railway.app",
+        "localhost",
+        "127.0.0.1",
+    ],
+)
 
 # ================= INSTALLED APPS =================
 INSTALLED_APPS = [
@@ -71,17 +122,7 @@ WSGI_APPLICATION = 'tms.wsgi.application'
 
 # ================= DATABASE =================
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': os.getenv('MYSQLDATABASE', 'tms'),
-        'USER': os.getenv('MYSQLUSER', 'root'),
-        'PASSWORD': os.getenv('MYSQLPASSWORD', ''),
-        'HOST': os.getenv('MYSQLHOST', 'localhost'),
-        'PORT': os.getenv('MYSQLPORT', '3306'),
-        'OPTIONS': {
-            'charset': 'utf8mb4',
-        },
-    }
+    'default': _get_database_config()
 }
 
 # ================= AUTH =================
@@ -126,22 +167,22 @@ SIMPLE_JWT = {
 # ================= CORS CONFIG =================
 CORS_ALLOW_ALL_ORIGINS = False
 
-CORS_ALLOWED_ORIGINS = [
+DEFAULT_FRONTEND_ORIGINS = [
     "https://tms-gules-iota.vercel.app",
     "https://tmsethnotec.netlify.app",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
 
+CORS_ALLOWED_ORIGINS = _get_env_list("CORS_ALLOWED_ORIGINS", DEFAULT_FRONTEND_ORIGINS)
+
 CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_ALL_HEADERS = True
+CORS_ALLOW_HEADERS = list(default_headers) + ["authorization"]
 CORS_ALLOW_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"]
 CORS_PREFLIGHT_MAX_AGE = 86400
 CORS_EXPOSE_HEADERS = ["Content-Type", "Authorization"]
 
-CSRF_TRUSTED_ORIGINS = [
-    "https://tms-gules-iota.vercel.app",
-    "https://tmsethnotec.netlify.app",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-]
+CSRF_TRUSTED_ORIGINS = _get_env_list("CSRF_TRUSTED_ORIGINS", CORS_ALLOWED_ORIGINS)
+
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+USE_X_FORWARDED_HOST = True

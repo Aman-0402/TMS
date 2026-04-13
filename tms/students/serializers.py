@@ -7,6 +7,10 @@ class StudentSerializer(serializers.ModelSerializer):
     ug_number = serializers.CharField()
     batch_name = serializers.CharField(source="batch.name", read_only=True)
     lab_name = serializers.CharField(source="lab.name", read_only=True)
+    trainer_id = serializers.IntegerField(source="lab.trainer_id", read_only=True)
+    trainer_name = serializers.CharField(source="lab.trainer.user.username", read_only=True)
+    mock_status = serializers.SerializerMethodField()
+    final_status = serializers.SerializerMethodField()
 
     class Meta:
         model = Student
@@ -21,6 +25,10 @@ class StudentSerializer(serializers.ModelSerializer):
             "batch_name",
             "lab",
             "lab_name",
+            "trainer_id",
+            "trainer_name",
+            "mock_status",
+            "final_status",
         )
         read_only_fields = ("id",)
 
@@ -34,3 +42,17 @@ class StudentSerializer(serializers.ModelSerializer):
             )
 
         return attrs
+
+    def get_mock_status(self, obj):
+        result = obj.results.filter(batch=obj.batch).only("mid_mock").first()
+        if not result:
+            return "PENDING"
+
+        return "PASS" if result.mid_mock >= 70 else "FAIL"
+
+    def get_final_status(self, obj):
+        result = obj.results.filter(batch=obj.batch).only("is_final_mock_pass").first()
+        if not result:
+            return "PENDING"
+
+        return "PASS" if result.is_final_mock_pass else "FAIL"

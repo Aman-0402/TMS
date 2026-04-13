@@ -1,12 +1,13 @@
 from django.db.models import Q
 from rest_framework import generics, permissions, status, viewsets
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 
 from .models import AuditLog, Manager, User
 from .permissions import IsAdmin, IsAdminOrManager
+from trainers.models import Trainer
 from .serializers import (
     AdminUserSerializer,
     AuditLogSerializer,
@@ -165,6 +166,41 @@ class AvailableTrainerUserListView(generics.ListAPIView):
             is_approved=True,
             is_active=True,
         ).select_related("trainer_profile", "trainer_profile__batch").prefetch_related("trainer_profile__labs").order_by("username")
+
+
+class TrainerAvailabilityView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrManager]
+
+    def patch(self, request, pk, *args, **kwargs):
+        trainer_user = User.objects.filter(
+            pk=pk,
+            role="TRAINER",
+            is_approved=True,
+            is_active=True,
+        ).first()
+        if not trainer_user:
+            return Response({"error": "Trainer user not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        is_available = request.data.get("is_available")
+        if isinstance(is_available, str):
+            is_available = is_available.lower() == "true"
+
+        if is_available is None:
+            raise ValidationError({"is_available": "This field is required."})
+
+        trainer_profile, _ = Trainer.objects.get_or_create(user=trainer_user)
+        trainer_profile.is_available = bool(is_available)
+        trainer_profile.save(update_fields=["is_available"])
+
+        return Response(
+            {
+                "message": "Trainer availability updated successfully.",
+                "user_id": trainer_user.id,
+                "trainer_profile_id": trainer_profile.id,
+                "is_available": trainer_profile.is_available,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class AvailableManagerUserListView(generics.ListAPIView):

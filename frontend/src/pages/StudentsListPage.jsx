@@ -16,8 +16,23 @@ function StudentsListPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedBatch, setSelectedBatch] = useState("");
   const [selectedLab, setSelectedLab] = useState("");
+  const [selectedTrainer, setSelectedTrainer] = useState("");
   const [sortField, setSortField] = useState("name");
   const [sortDirection, setSortDirection] = useState("asc");
+
+  const trainerOptions = useMemo(() => {
+    const trainersById = new Map();
+    students.forEach((student) => {
+      if (student.trainer_id && !trainersById.has(student.trainer_id)) {
+        trainersById.set(student.trainer_id, {
+          id: student.trainer_id,
+          name: student.trainer_name || `Trainer ${student.trainer_id}`,
+        });
+      }
+    });
+
+    return Array.from(trainersById.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [students]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -51,15 +66,18 @@ function StudentsListPage() {
         !selectedBatch || String(student.batch) === selectedBatch;
       const matchesLab =
         !selectedLab || String(student.lab) === selectedLab;
+      const matchesTrainer =
+        !selectedTrainer || String(student.trainer_id) === selectedTrainer;
       const matchesSearch =
         !normalizedSearch ||
         student.ug_number?.toLowerCase().includes(normalizedSearch) ||
         student.name?.toLowerCase().includes(normalizedSearch) ||
         student.department?.toLowerCase().includes(normalizedSearch) ||
         student.batch_name?.toLowerCase().includes(normalizedSearch) ||
-        student.lab_name?.toLowerCase().includes(normalizedSearch);
+        student.lab_name?.toLowerCase().includes(normalizedSearch) ||
+        student.trainer_name?.toLowerCase().includes(normalizedSearch);
 
-      return matchesBatch && matchesLab && matchesSearch;
+      return matchesBatch && matchesLab && matchesTrainer && matchesSearch;
     });
 
     // Sort the filtered results
@@ -88,7 +106,7 @@ function StudentsListPage() {
     });
 
     return filtered;
-  }, [searchTerm, selectedBatch, selectedLab, sortField, sortDirection, students]);
+  }, [searchTerm, selectedBatch, selectedLab, selectedTrainer, sortField, sortDirection, students]);
 
   const handleSort = (field) => {
     if (sortField === field) {
@@ -164,6 +182,25 @@ function StudentsListPage() {
             </div>
 
             <div className="col-md-2">
+              <label className="form-label fw-semibold" htmlFor="student-trainer-filter">
+                Trainer
+              </label>
+              <select
+                id="student-trainer-filter"
+                className="form-select"
+                value={selectedTrainer}
+                onChange={(event) => setSelectedTrainer(event.target.value)}
+              >
+                <option value="">All trainers</option>
+                {trainerOptions.map((trainer) => (
+                  <option key={trainer.id} value={trainer.id}>
+                    {trainer.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="col-md-12 col-xl-2">
               <label className="form-label fw-semibold" htmlFor="student-sort">
                 Sort by
               </label>
@@ -241,6 +278,7 @@ function StudentsListPage() {
                       <th scope="col" className="sortable" onClick={() => handleSort('lab_name')} style={{ cursor: 'pointer' }}>
                         Lab {sortField === 'lab_name' && (sortDirection === 'asc' ? '↑' : '↓')}
                       </th>
+                      <th scope="col">Trainer</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -254,6 +292,7 @@ function StudentsListPage() {
                         <td>{student.phone || "-"}</td>
                         <td>{student.batch_name || "-"}</td>
                         <td>{student.lab_name || "-"}</td>
+                        <td>{student.trainer_name || "-"}</td>
                       </tr>
                     ))}
                   </tbody>

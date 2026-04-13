@@ -12,10 +12,13 @@ class Trainer(models.Model):
         "batch.Batch",
         on_delete=models.CASCADE,
         related_name="trainers",
+        null=True,
+        blank=True,
     )
+    is_available = models.BooleanField(default=True, db_index=True)
 
     class Meta:
         ordering = ["user__username"]
 
     def __str__(self) -> str:
-        return f"{self.user.username} - {self.batch.name}"
+        return f"{self.user.username} - {self.batch.name if self.batch_id else 'Unassigned'}"

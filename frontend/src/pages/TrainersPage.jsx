@@ -69,6 +69,13 @@ function TrainersPage() {
     return labs.filter((lab) => String(lab.batch) === formData.batch);
   }, [formData.batch, labs]);
 
+  const assignableTrainerUsers = useMemo(() => {
+    return trainerUsers.filter(
+      (trainerUser) =>
+        trainerUser.is_available || String(trainerUser.id) === formData.user
+    );
+  }, [formData.user, trainerUsers]);
+
   const loadData = async () => {
     setError("");
 
@@ -162,6 +169,24 @@ function TrainersPage() {
     }
   };
 
+  const handleToggleAvailability = async (trainerUser) => {
+    try {
+      await http.patch(`available-trainers/${trainerUser.id}/availability/`, {
+        is_available: !trainerUser.is_available,
+      });
+      toast.success(
+        `${trainerUser.username} marked as ${!trainerUser.is_available ? "available" : "unavailable"}.`
+      );
+      await loadData();
+    } catch (requestError) {
+      toast.error(
+        requestError.response?.data?.is_available?.[0] ||
+          requestError.response?.data?.error ||
+          "Unable to update trainer availability."
+      );
+    }
+  };
+
   return (
     <>
       <PageHeader
@@ -207,12 +232,15 @@ function TrainersPage() {
                     required
                   >
                     <option value="">Select trainer</option>
-                    {trainerUsers.map((trainerUser) => (
+                    {assignableTrainerUsers.map((trainerUser) => (
                       <option key={trainerUser.id} value={trainerUser.id}>
                         {trainerUser.username}
                       </option>
                     ))}
                   </select>
+                  <div className="form-text">
+                    Only trainers marked as available are shown for new assignments.
+                  </div>
                 </div>
 
                 <div className="mb-3">
@@ -317,6 +345,7 @@ function TrainersPage() {
                         <th scope="col" style={{ width: '60px' }}>S. No</th>
                         <th scope="col">Username</th>
                         <th scope="col">Email</th>
+                        <th scope="col">Availability</th>
                         <th scope="col">Batch</th>
                         <th scope="col">Assigned Labs</th>
                         <th scope="col" className="text-end">Action</th>
@@ -328,6 +357,11 @@ function TrainersPage() {
                           <td className="text-muted fw-semibold">{index + 1}</td>
                           <td>{trainerUser.username}</td>
                           <td>{trainerUser.email || "-"}</td>
+                          <td>
+                            <span className={`badge ${trainerUser.is_available ? "bg-success" : "bg-secondary"}`}>
+                              {trainerUser.is_available ? "Available" : "Unavailable"}
+                            </span>
+                          </td>
                           <td>{trainerUser.current_batch_name || "Unassigned"}</td>
                           <td>
                             {trainerUser.assigned_lab_names?.length
@@ -335,14 +369,24 @@ function TrainersPage() {
                               : "Unassigned"}
                           </td>
                           <td className="text-end">
-                            <button
-                              type="button"
-                              className="btn btn-sm btn-outline-primary"
-                              onClick={() => handleEdit(trainerUser)}
-                              disabled={isSubmitting}
-                            >
-                              {trainerUser.trainer_profile_id ? "Edit" : "Assign"}
-                            </button>
+                            <div className="d-inline-flex gap-2">
+                              <button
+                                type="button"
+                                className={`btn btn-sm ${trainerUser.is_available ? "btn-outline-secondary" : "btn-outline-success"}`}
+                                onClick={() => handleToggleAvailability(trainerUser)}
+                                disabled={isSubmitting}
+                              >
+                                {trainerUser.is_available ? "Mark Unavailable" : "Mark Available"}
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-outline-primary"
+                                onClick={() => handleEdit(trainerUser)}
+                                disabled={isSubmitting}
+                              >
+                                {trainerUser.trainer_profile_id ? "Edit" : "Assign"}
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}

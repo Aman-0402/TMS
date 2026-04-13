@@ -14,13 +14,15 @@ import { ACCESS_TOKEN_KEY, clearStoredAuth } from "../auth/storage";
  * Never do: API.post("/api/login/") ❌ (creates double /api)
  */
 
-// Get API URL from environment variable
-const API_URL = import.meta.env.VITE_API_URL
-  ? import.meta.env.VITE_API_URL.replace(/\/$/, "") // Remove trailing slash if present
-  : "https://tms.up.railway.app"; // Fallback for development
+// Get API URL from environment variable.
+// Accept either:
+// - https://your-backend.up.railway.app
+// - https://your-backend.up.railway.app/api
+const rawApiUrl = import.meta.env.VITE_API_URL
+  ? import.meta.env.VITE_API_URL.replace(/\/$/, "")
+  : "https://tms.up.railway.app";
 
-// Construct complete baseURL with /api suffix
-const baseURL = `${API_URL}/api`;
+const baseURL = rawApiUrl.endsWith("/api") ? rawApiUrl : `${rawApiUrl}/api`;
 
 console.log(`[API] Configured baseURL: ${baseURL}`);
 

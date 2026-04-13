@@ -28,4 +28,9 @@ router.register("student-attendance", StudentAttendanceViewSet, basename="studen
 urlpatterns = router.urls + [
     path("trainer-users/", AvailableTrainerUserListView.as_view(), name="trainer-users"),
     path("manager-users/", AvailableManagerUserListView.as_view(), name="manager-users"),
+    path(
+        "attendance/export/",
+        StudentAttendanceViewSet.as_view({"get": "export"}),
+        name="attendance-export",
+    ),
 ]

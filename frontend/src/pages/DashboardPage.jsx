@@ -43,6 +43,7 @@ function DashboardPage() {
   const [results,  setResults]  = useState([]);
   const [trainers, setTrainers] = useState([]);
   const [labs,     setLabs]     = useState([]);
+  const [trainerStats, setTrainerStats] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError]         = useState("");
 
@@ -58,16 +59,18 @@ function DashboardPage() {
       http.get("courses/"),
       http.get("results/"),
       http.get("labs/"),
+      http.get("trainers/dashboard-stats/"),
     ];
     if (showFull) promises.push(http.get("trainers/"));
 
     Promise.all(promises)
-      .then(([sRes, bRes, cRes, rRes, lRes, tRes]) => {
+      .then(([sRes, bRes, cRes, rRes, lRes, statsRes, tRes]) => {
         setStudents(normalizeApiList(sRes.data));
         setBatches(normalizeApiList(bRes.data));
         setCourses(normalizeApiList(cRes.data));
         setResults(normalizeApiList(rRes.data));
         setLabs(normalizeApiList(lRes.data));
+        setTrainerStats(Array.isArray(statsRes.data) ? statsRes.data : statsRes.data || {});
         if (tRes) setTrainers(normalizeApiList(tRes.data));
       })
       .catch(() => setError("Unable to load dashboard data."))
@@ -186,6 +189,36 @@ function DashboardPage() {
     { title: "Mock Eligible",   value: useMemo(() => filteredResults.filter((r) => r.is_final_mock_pass).length, [filteredResults]),   tone: "warning", description: "Students who passed the Final Mock (≥70%)." },
   ];
 
+  const trainerStatsList = Array.isArray(trainerStats) ? trainerStats : [];
+  const trainerDashboardCards = role === "TRAINER"
+    ? [
+        {
+          title: "Total Students Trained",
+          value: trainerStats.total_students_trained || 0,
+          tone: "primary",
+          description: "Distinct students currently mapped to your labs.",
+        },
+        {
+          title: "Total Batches",
+          value: trainerStats.total_batches_handled || 0,
+          tone: "success",
+          description: "Distinct batches covered by your current lab ownership.",
+        },
+        {
+          title: "Students Passed Mock",
+          value: trainerStats.students_passed_mock || 0,
+          tone: "warning",
+          description: "Students with mid mock score 70 or above.",
+        },
+        {
+          title: "Students Passed Final Mock",
+          value: trainerStats.students_passed_final_mock || 0,
+          tone: "info",
+          description: "Students who cleared the final mock.",
+        },
+      ]
+    : [];
+
   return (
     <>
       <PageHeader
@@ -253,6 +286,16 @@ function DashboardPage() {
       </div>
 
       {/* Stat cards */}
+      {role === "TRAINER" && (
+        <div className="row g-4 mb-4">
+          {trainerDashboardCards.map((card) => (
+            <div className="col-md-6 col-xl-3" key={card.title}>
+              <StatCard {...card} isLoading={isLoading} />
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="row g-4 mb-4">
         {summaryCards.map((card) => (
           <div className="col-md-6 col-xl-3" key={card.title}>
@@ -310,45 +353,39 @@ function DashboardPage() {
                     <small className="text-muted">Filtered view</small>
                   )}
                 </div>
-                {isLoading ? <p className="text-secondary">Loading…</p> : trainerPerf.length === 0 ? (
-                  <p className="text-secondary small">No trainer result data yet.</p>
+                {isLoading ? <p className="text-secondary">Loading…</p> : trainerStatsList.length === 0 ? (
+                  <p className="text-secondary small">No trainer analytics yet.</p>
                 ) : (
                   <div className="table-responsive">
                     <table className="table table-hover align-middle mb-0">
                       <thead className="table-light">
                         <tr>
                           <th style={{ width: "50px" }}>S. No</th>
-                          <th>Trainer / Batch</th>
+                          <th>Trainer</th>
+                          <th>Batch</th>
+                          <th>Availability</th>
                           <th>Total Students</th>
-                          <th>Pass</th>
-                          <th>Fail</th>
-                          <th>Pass Rate</th>
-                          <th style={{ width: 200 }}>Progress</th>
+                          <th>Batches</th>
+                          <th>Passed Mock</th>
+                          <th>Passed Final Mock</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {trainerPerf.map((t, idx) => {
-                          const rate = t.total > 0 ? Math.round((t.pass / t.total) * 100) : 0;
+                        {trainerStatsList.map((trainer, idx) => {
                           return (
-                            <tr key={t.name}>
+                            <tr key={trainer.trainer_profile_id || trainer.trainer_name}>
                               <td className="text-muted fw-semibold">{idx + 1}</td>
-                              <td className="fw-medium">{t.name}</td>
-                              <td>{t.total}</td>
-                              <td className="text-success fw-semibold">{t.pass}</td>
-                              <td className="text-danger fw-semibold">{t.fail}</td>
+                              <td className="fw-medium">{trainer.trainer_name}</td>
+                              <td>{trainer.batch_name || "Unassigned"}</td>
                               <td>
-                                <span className={`badge bg-${rate >= 70 ? "success" : rate >= 40 ? "warning text-dark" : "danger"}`}>
-                                  {rate}%
+                                <span className={`badge bg-${trainer.is_available ? "success" : "secondary"}`}>
+                                  {trainer.is_available ? "Available" : "Unavailable"}
                                 </span>
                               </td>
-                              <td>
-                                <div className="progress" style={{ height: 8 }}>
-                                  <div
-                                    className={`progress-bar bg-${rate >= 70 ? "success" : rate >= 40 ? "warning" : "danger"}`}
-                                    style={{ width: `${rate}%` }}
-                                  />
-                                </div>
-                              </td>
+                              <td>{trainer.total_students_trained}</td>
+                              <td>{trainer.total_batches_handled}</td>
+                              <td>{trainer.students_passed_mock}</td>
+                              <td>{trainer.students_passed_final_mock}</td>
                             </tr>
                           );
                         })}

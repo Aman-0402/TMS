@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import Swal from "sweetalert2";
 
@@ -213,17 +213,33 @@ function WorkingDaysManager({ batches }) {
 function AttendanceReport({ batches }) {
   const [selectedBatch, setSelectedBatch] = useState("");
   const [selectedLab, setSelectedLab] = useState("");
+  const [selectedTrainer, setSelectedTrainer] = useState("");
   const [labs, setLabs] = useState([]);
   const [selectedDate, setSelectedDate]   = useState("");
   const [selectedSlot, setSelectedSlot]   = useState("1");
   const [workingDays, setWorkingDays]     = useState([]);
   const [records, setRecords]             = useState([]);
   const [isLoading, setIsLoading]         = useState(false);
+  const [isExporting, setIsExporting]     = useState(false);
+
+  const trainerOptions = useMemo(() => {
+    const trainers = new Map();
+    labs.forEach((lab) => {
+      if (lab.trainer && !trainers.has(lab.trainer)) {
+        trainers.set(lab.trainer, {
+          id: lab.trainer,
+          name: lab.trainer_name || `Trainer ${lab.trainer}`,
+        });
+      }
+    });
+    return Array.from(trainers.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [labs]);
 
   useEffect(() => {
     if (!selectedBatch) { 
       setLabs([]); 
       setSelectedLab(""); 
+      setSelectedTrainer("");
       setWorkingDays([]); 
       setSelectedDate(""); 
       setRecords([]); 
@@ -238,6 +254,7 @@ function AttendanceReport({ batches }) {
       setWorkingDays(normalizeList(wdRes.data));
     }).catch(() => {});
     setSelectedLab("");
+    setSelectedTrainer("");
     setSelectedDate("");
     setRecords([]);
   }, [selectedBatch]);
@@ -249,13 +266,51 @@ function AttendanceReport({ batches }) {
     if (selectedLab) {
       url += `&lab=${selectedLab}`;
     }
+    if (selectedTrainer) {
+      url += `&trainer=${selectedTrainer}`;
+    }
     http.get(url)
       .then((res) => setRecords(normalizeList(res.data)))
       .catch(() => toast.error("Failed to load attendance."))
       .finally(() => setIsLoading(false));
-  }, [selectedDate, selectedSlot, selectedBatch, selectedLab]);
+  }, [selectedDate, selectedSlot, selectedBatch, selectedLab, selectedTrainer]);
 
   const summary = records.reduce((acc, r) => { acc[r.status] = (acc[r.status] || 0) + 1; return acc; }, {});
+
+  const handleExport = async () => {
+    if (!selectedBatch) {
+      toast.error("Select a batch before exporting attendance.");
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      const response = await http.get("attendance/export/", {
+        responseType: "blob",
+        params: {
+          batch: selectedBatch,
+          ...(selectedLab ? { lab: selectedLab } : {}),
+          ...(selectedTrainer ? { trainer: selectedTrainer } : {}),
+          ...(selectedDate ? { date: selectedDate } : {}),
+          ...(selectedSlot ? { slot: selectedSlot } : {}),
+        },
+      });
+
+      const blobUrl = window.URL.createObjectURL(new Blob([response.data]));
+      const anchor = document.createElement("a");
+      anchor.href = blobUrl;
+      anchor.download = `attendance-${selectedBatch}-${selectedDate || "all"}.xlsx`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.URL.revokeObjectURL(blobUrl);
+      toast.success("Attendance export downloaded.");
+    } catch (error) {
+      toast.error("Unable to export attendance.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
 
   return (
@@ -281,17 +336,42 @@ function AttendanceReport({ batches }) {
                 </select>
               </div>
               <div className="col-sm-3">
+                <label className="form-label" htmlFor="rep-trainer">Trainer</label>
+                <select
+                  id="rep-trainer"
+                  className="form-select"
+                  value={selectedTrainer}
+                  onChange={(e) => setSelectedTrainer(e.target.value)}
+                  disabled={!selectedBatch || trainerOptions.length === 0}
+                >
+                  <option value="">All trainers</option>
+                  {trainerOptions.map((trainer) => (
+                    <option key={trainer.id} value={trainer.id}>{trainer.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="col-sm-3">
                 <label className="form-label" htmlFor="rep-date">Working Day</label>
                 <select id="rep-date" className="form-select" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} disabled={!selectedBatch || workingDays.length === 0}>
                   <option value="">Select date</option>
                   {workingDays.map((d) => <option key={d.id} value={d.date}>{formatDate(d.date)}</option>)}
                 </select>
               </div>
-              <div className="col-sm-3">
+              <div className="col-sm-2">
                 <label className="form-label" htmlFor="rep-slot">Slot</label>
                 <select id="rep-slot" className="form-select" value={selectedSlot} onChange={(e) => setSelectedSlot(e.target.value)} disabled={!selectedDate}>
                   {SLOTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
                 </select>
+              </div>
+              <div className="col-sm-1 d-flex align-items-end">
+                <button
+                  type="button"
+                  className="btn btn-outline-success w-100"
+                  onClick={handleExport}
+                  disabled={isExporting || !selectedBatch}
+                >
+                  {isExporting ? "..." : "Export"}
+                </button>
               </div>
             </div>
 

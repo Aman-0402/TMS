@@ -26,7 +26,9 @@ class TrainerSerializer(serializers.ModelSerializer):
         queryset=Batch.objects.filter(
             is_deleted=False,
             is_active=True,
-        )
+        ),
+        required=False,
+        allow_null=True,
     )
     username = serializers.CharField(source="user.username", read_only=True)
     email = serializers.EmailField(source="user.email", read_only=True)
@@ -37,6 +39,7 @@ class TrainerSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True,
     )
+    is_available = serializers.BooleanField(required=False)
     current_lab_id = serializers.SerializerMethodField()
     assigned_lab_names = serializers.SerializerMethodField()
 
@@ -50,6 +53,7 @@ class TrainerSerializer(serializers.ModelSerializer):
             "batch",
             "batch_name",
             "lab",
+            "is_available",
             "current_lab_id",
             "assigned_lab_names",
         )
@@ -70,24 +74,48 @@ class TrainerSerializer(serializers.ModelSerializer):
         return super().to_internal_value(normalized_data)
 
     def validate(self, attrs):
+        user = attrs.get("user", getattr(self.instance, "user", None))
         batch = attrs.get("batch", getattr(self.instance, "batch", None))
         lab = attrs.get("lab")
+        existing_profile = None
+
+        if user:
+            existing_profile = self.instance or Trainer.objects.filter(user=user).first()
+
+        if lab and not batch:
+            raise serializers.ValidationError(
+                {"batch": "Batch is required when assigning a lab."}
+            )
 
         if lab and batch and lab.batch_id != batch.id:
             raise serializers.ValidationError(
                 {"lab": "Assigned lab must belong to the same batch as the trainer."}
             )
 
+        if (
+            batch
+            and existing_profile
+            and not existing_profile.is_available
+            and not self.instance
+        ):
+            raise serializers.ValidationError(
+                {"user": "Trainer is not marked as available for a new batch."}
+            )
+
         return attrs
 
     def create(self, validated_data):
         lab = validated_data.pop("lab", None)
+        is_available = validated_data.pop("is_available", True)
 
         try:
             with transaction.atomic():
                 trainer, _ = Trainer.objects.update_or_create(
                     user=validated_data["user"],
-                    defaults={"batch": validated_data["batch"]},
+                    defaults={
+                        "batch": validated_data.get("batch"),
+                        "is_available": False if validated_data.get("batch") else is_available,
+                    },
                 )
                 self._assign_lab(trainer, lab)
                 return trainer
@@ -97,11 +125,18 @@ class TrainerSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         lab = validated_data.pop("lab", None)
+        explicit_availability = validated_data.pop("is_available", None)
 
         try:
             with transaction.atomic():
                 for attribute, value in validated_data.items():
                     setattr(instance, attribute, value)
+
+                if explicit_availability is not None:
+                    instance.is_available = explicit_availability
+
+                if instance.batch_id:
+                    instance.is_available = False
 
                 instance.save()
                 self._assign_lab(instance, lab)

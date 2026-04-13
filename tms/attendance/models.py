@@ -50,6 +50,13 @@ class StudentAttendance(models.Model):
         on_delete=models.CASCADE,
         related_name="student_attendance_records",
     )
+    lab = models.ForeignKey(
+        "labs.Lab",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="attendance_records",
+    )
     date = models.DateField(db_index=True)
     slot = models.CharField(
         max_length=1,

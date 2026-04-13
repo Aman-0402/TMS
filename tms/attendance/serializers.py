@@ -26,12 +26,29 @@ class WorkingDaySerializer(serializers.ModelSerializer):
 
 class StudentAttendanceSerializer(serializers.ModelSerializer):
     student_name = serializers.CharField(source="student.name", read_only=True)
+    lab = serializers.PrimaryKeyRelatedField(read_only=True)
+    lab_name = serializers.CharField(source="lab.name", read_only=True)
+    trainer_id = serializers.IntegerField(source="lab.trainer_id", read_only=True)
+    trainer_name = serializers.CharField(source="lab.trainer.user.username", read_only=True)
     slot_label = serializers.CharField(source="get_slot_display", read_only=True)
 
     class Meta:
         model = StudentAttendance
-        fields = ("id", "student", "student_name", "batch", "date", "slot", "slot_label", "status")
-        read_only_fields = ("id", "student_name", "slot_label")
+        fields = (
+            "id",
+            "student",
+            "student_name",
+            "batch",
+            "lab",
+            "lab_name",
+            "trainer_id",
+            "trainer_name",
+            "date",
+            "slot",
+            "slot_label",
+            "status",
+        )
+        read_only_fields = ("id", "student_name", "lab", "lab_name", "trainer_id", "trainer_name", "slot_label")
 
     def validate(self, attrs):
         student = attrs.get("student", getattr(self.instance, "student", None))
@@ -41,6 +58,11 @@ class StudentAttendanceSerializer(serializers.ModelSerializer):
         if student and batch and student.batch_id != batch.id:
             raise serializers.ValidationError(
                 {"batch": "Selected batch must match the student's batch."}
+            )
+
+        if student and student.lab and batch and student.lab.batch_id != batch.id:
+            raise serializers.ValidationError(
+                {"lab": "Selected student's lab must belong to the same batch."}
             )
 
         if batch and date:

@@ -17,6 +17,7 @@ from .views import (
     AdminUserDetailView,
     AvailableTrainerUserListView,
     AvailableManagerUserListView,
+    TrainerAvailabilityView,
     AuditLogViewSet,
     ManagerViewSet,
 )
@@ -48,6 +49,7 @@ urlpatterns = [
     # Keep this endpoint for listing available trainer accounts, but avoid
     # colliding with the trainer-assignment router in tms.api_urls.
     path('available-trainers/', AvailableTrainerUserListView.as_view(), name='available-trainers'),
+    path('available-trainers/<int:pk>/availability/', TrainerAvailabilityView.as_view(), name='trainer-availability'),
     path('managers-list/', AvailableManagerUserListView.as_view(), name='available-managers'),
 
     # ==================== VIEWSET ROUTES ====================

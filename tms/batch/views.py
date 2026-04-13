@@ -1,3 +1,4 @@
+from django.db.models import Count, Q
 from rest_framework import viewsets
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
@@ -57,7 +58,14 @@ class BatchViewSet(SoftDeleteMixin, AuditLogMixin, RoleScopedQuerysetMixin, view
         return [IsAuthenticated()]
 
     def get_base_queryset(self):
-        return Batch.objects.select_related("course", "created_by").order_by("-created_at")
+        return (
+            Batch.objects.select_related("course", "created_by")
+            .annotate(
+                student_count=Count("students", filter=Q(students__is_deleted=False), distinct=True),
+                lab_count=Count("labs", distinct=True),
+            )
+            .order_by("-created_at")
+        )
 
     def get_queryset(self):
         self.debug_request_user("get_queryset")

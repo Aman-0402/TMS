@@ -128,3 +128,22 @@ class TrainerAssignmentAPITests(APITestCase):
             response.data["lab"][0],
             "Assigned lab must belong to the same batch as the trainer.",
         )
+
+    def test_rejects_assignment_for_unavailable_trainer(self):
+        Trainer.objects.create(user=self.trainer_user, is_available=False)
+
+        response = self.client.post(
+            reverse("trainer-list"),
+            {
+                "trainer_id": self.trainer_user.id,
+                "batch_id": self.batch.id,
+                "lab_id": self.lab.id,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["user"][0],
+            "Trainer is not marked as available for a new batch.",
+        )

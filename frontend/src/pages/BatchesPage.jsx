@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Swal from "sweetalert2";
 import { toast } from "react-toastify";
 
@@ -181,7 +181,12 @@ function BatchesPage() {
 
   const [batches, setBatches]         = useState([]);
   const [courses, setCourses]         = useState([]);
+  const [labs, setLabs]               = useState([]);
   const [formData, setFormData]       = useState(initialFormData);
+  const [copyLabsFromPrevious, setCopyLabsFromPrevious] = useState(false);
+  const [sourceBatchId, setSourceBatchId] = useState("");
+  const [labRangeInput, setLabRangeInput] = useState("");
+  const [selectedLabs, setSelectedLabs] = useState([]);
   const [isLoading, setIsLoading]     = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError]             = useState("");
@@ -192,12 +197,14 @@ function BatchesPage() {
   const loadData = async () => {
     setError("");
     try {
-      const [batchesResponse, coursesResponse] = await Promise.all([
+      const [batchesResponse, coursesResponse, labsResponse] = await Promise.all([
         http.get("batches/"),
         http.get("courses/"),
+        http.get("labs/"),
       ]);
       setBatches(normalizeApiList(batchesResponse.data));
       setCourses(normalizeApiList(coursesResponse.data));
+      setLabs(normalizeApiList(labsResponse.data));
     } catch {
       setError("Unable to load batches or courses. Please check the backend server.");
     } finally {
@@ -212,6 +219,38 @@ function BatchesPage() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const resetBatchSetup = () => {
+    setCopyLabsFromPrevious(false);
+    setSourceBatchId("");
+    setLabRangeInput("");
+    setSelectedLabs([]);
+  };
+
+  const availableLabOptions = useMemo(() => {
+    const uniqueNames = new Set(
+      labs
+        .map((lab) => String(lab.name || "").trim())
+        .filter(Boolean)
+    );
+
+    return Array.from(uniqueNames).sort((a, b) =>
+      a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" })
+    );
+  }, [labs]);
+
+  const previousBatches = useMemo(
+    () => [...batches].sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0)),
+    [batches]
+  );
+
+  const toggleSelectedLab = (labName) => {
+    setSelectedLabs((current) =>
+      current.includes(labName)
+        ? current.filter((item) => item !== labName)
+        : [...current, labName]
+    );
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     setSubmitError("");
@@ -219,6 +258,16 @@ function BatchesPage() {
 
     if (!formData.name.trim() || !formData.course || !formData.start_date || !formData.end_date) {
       setSubmitError("Batch name, course, start date, and end date are required.");
+      return;
+    }
+
+    if (copyLabsFromPrevious && !sourceBatchId) {
+      setSubmitError("Select the previous batch to copy labs from.");
+      return;
+    }
+
+    if (!copyLabsFromPrevious && selectedLabs.length === 0 && !labRangeInput.trim()) {
+      setSubmitError("Select labs manually or provide a lab range input.");
       return;
     }
 
@@ -230,15 +279,25 @@ function BatchesPage() {
         start_date: formData.start_date,
         end_date: formData.end_date,
         status: "ACTIVE",
+        ...(copyLabsFromPrevious
+          ? { copy_labs_from_batch: Number(sourceBatchId) }
+          : {
+              selected_labs: selectedLabs,
+              lab_range_input: labRangeInput.trim(),
+            }),
       });
       setSuccessMessage("Batch created successfully.");
       setFormData(initialFormData);
+      resetBatchSetup();
       await loadData();
     } catch (requestError) {
       setSubmitError(
         requestError.response?.data?.detail ||
           requestError.response?.data?.end_date?.[0] ||
           requestError.response?.data?.name?.[0] ||
+          requestError.response?.data?.selected_labs?.[0] ||
+          requestError.response?.data?.lab_range_input?.[0] ||
+          requestError.response?.data?.copy_labs_from_batch?.[0] ||
           "Unable to create batch."
       );
     } finally {
@@ -399,6 +458,106 @@ function BatchesPage() {
                   />
                 </div>
 
+                <div className="mb-3">
+                  <div className="form-check form-switch">
+                    <input
+                      id="copy-labs-switch"
+                      className="form-check-input"
+                      type="checkbox"
+                      checked={copyLabsFromPrevious}
+                      onChange={(event) => {
+                        const isChecked = event.target.checked;
+                        setCopyLabsFromPrevious(isChecked);
+                        if (isChecked) {
+                          setSelectedLabs([]);
+                          setLabRangeInput("");
+                        } else {
+                          setSourceBatchId("");
+                        }
+                      }}
+                    />
+                    <label className="form-check-label" htmlFor="copy-labs-switch">
+                      Copy labs from previous batch
+                    </label>
+                  </div>
+                </div>
+
+                {copyLabsFromPrevious ? (
+                  <div className="mb-4">
+                    <label className="form-label" htmlFor="copy-source-batch">Previous Batch</label>
+                    <select
+                      id="copy-source-batch"
+                      className="form-select"
+                      value={sourceBatchId}
+                      onChange={(event) => setSourceBatchId(event.target.value)}
+                      disabled={isLoading || isSubmitting}
+                      required
+                    >
+                      <option value="">Select previous batch</option>
+                      {previousBatches.map((batch) => (
+                        <option key={batch.id} value={batch.id}>
+                          {batch.name} ({batch.lab_count || 0} labs)
+                        </option>
+                      ))}
+                    </select>
+                    <div className="form-text">
+                      Only lab names will be copied. Trainer assignments stay empty.
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="mb-3">
+                      <label className="form-label" htmlFor="lab-range-input">Lab Range Input</label>
+                      <input
+                        id="lab-range-input"
+                        type="text"
+                        className="form-control"
+                        value={labRangeInput}
+                        onChange={(event) => setLabRangeInput(event.target.value)}
+                        placeholder="501-513,701,801"
+                        disabled={isSubmitting}
+                      />
+                      <div className="form-text">
+                        Enter ranges or comma-separated values. Example: <code>501-513,701,801</code>
+                      </div>
+                    </div>
+
+                    <div className="mb-4">
+                      <div className="d-flex justify-content-between align-items-center mb-2">
+                        <label className="form-label mb-0">Quick Select Labs</label>
+                        <span className="badge text-bg-light">{selectedLabs.length} selected</span>
+                      </div>
+                      {availableLabOptions.length === 0 ? (
+                        <div className="alert alert-light mb-0 small">
+                          No previous lab names found yet. You can still use the range input above.
+                        </div>
+                      ) : (
+                        <div className="border rounded p-3" style={{ maxHeight: 200, overflowY: "auto" }}>
+                          <div className="row g-2">
+                            {availableLabOptions.map((labName) => (
+                              <div className="col-sm-6" key={labName}>
+                                <div className="form-check">
+                                  <input
+                                    id={`lab-option-${labName}`}
+                                    className="form-check-input"
+                                    type="checkbox"
+                                    checked={selectedLabs.includes(labName)}
+                                    onChange={() => toggleSelectedLab(labName)}
+                                    disabled={isSubmitting}
+                                  />
+                                  <label className="form-check-label" htmlFor={`lab-option-${labName}`}>
+                                    {labName}
+                                  </label>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+
                 <button
                   type="submit"
                   className="btn btn-primary w-100 d-flex justify-content-center align-items-center gap-2"
@@ -441,10 +600,12 @@ function BatchesPage() {
                         <th scope="col">Name</th>
                         <th scope="col">Course</th>
                         <th scope="col">Start</th>
-                        <th scope="col">End</th>
-                        <th scope="col">Status</th>
-                        {canModify && <th scope="col" className="text-end">Actions</th>}
-                      </tr>
+                          <th scope="col">End</th>
+                          <th scope="col">Status</th>
+                          <th scope="col">Labs</th>
+                          <th scope="col">Students</th>
+                          {canModify && <th scope="col" className="text-end">Actions</th>}
+                        </tr>
                     </thead>
                     <tbody>
                       {batches.map((batch, index) => (
@@ -463,6 +624,8 @@ function BatchesPage() {
                               {batch.is_active ? "Active" : "Inactive"}
                             </span>
                           </td>
+                          <td>{batch.lab_count ?? 0}</td>
+                          <td>{batch.student_count ?? 0}</td>
                           {canModify && (
                             <td className="text-end">
                               <div className="btn-group btn-group-sm" role="group">

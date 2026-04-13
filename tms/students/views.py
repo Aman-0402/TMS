@@ -56,7 +56,24 @@ class StudentViewSet(SoftDeleteMixin, AuditLogMixin, RoleScopedQuerysetMixin, vi
         return [IsAuthenticated()]
 
     def get_base_queryset(self):
-        return Student.objects.select_related("batch", "lab", "lab__trainer").order_by("name")
+        queryset = (
+            Student.objects.select_related("batch", "lab", "lab__trainer", "lab__trainer__user")
+            .prefetch_related("results")
+            .order_by("batch__name", "name")
+        )
+
+        batch_id = self.request.query_params.get("batch")
+        trainer_id = self.request.query_params.get("trainer")
+        lab_id = self.request.query_params.get("lab")
+
+        if batch_id:
+            queryset = queryset.filter(batch_id=batch_id)
+        if trainer_id:
+            queryset = queryset.filter(lab__trainer_id=trainer_id)
+        if lab_id:
+            queryset = queryset.filter(lab_id=lab_id)
+
+        return queryset
 
     def perform_create(self, serializer):
         self._validate_write_scope(serializer)

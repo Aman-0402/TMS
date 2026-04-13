@@ -1,5 +1,9 @@
+from io import BytesIO
+
 from django.db import transaction
 from django.db.models import Count, Q
+from django.http import HttpResponse
+from openpyxl import Workbook
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
@@ -49,13 +53,20 @@ class StudentAttendanceViewSet(RoleScopedQuerysetMixin, viewsets.ModelViewSet):
     trainer_distinct = True
 
     def get_base_queryset(self):
-        qs = StudentAttendance.objects.select_related("student", "batch").order_by(
+        qs = StudentAttendance.objects.select_related(
+            "student",
+            "batch",
+            "lab",
+            "lab__trainer",
+            "lab__trainer__user",
+        ).order_by(
             "-date", "slot", "student__name"
         )
         batch_id = self.request.query_params.get("batch")
         date = self.request.query_params.get("date")
         slot = self.request.query_params.get("slot")
         lab_id = self.request.query_params.get("lab")
+        trainer_id = self.request.query_params.get("trainer")
         if batch_id:
             qs = qs.filter(batch_id=batch_id)
         if date:
@@ -63,7 +74,9 @@ class StudentAttendanceViewSet(RoleScopedQuerysetMixin, viewsets.ModelViewSet):
         if slot:
             qs = qs.filter(slot=slot)
         if lab_id:
-            qs = qs.filter(student__lab_id=lab_id)
+            qs = qs.filter(lab_id=lab_id)
+        if trainer_id:
+            qs = qs.filter(lab__trainer_id=trainer_id)
         return qs
 
     def _assert_trainer_batch_access(self, batch):
@@ -74,12 +87,14 @@ class StudentAttendanceViewSet(RoleScopedQuerysetMixin, viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         self._assert_trainer_batch_access(serializer.validated_data.get("batch"))
-        serializer.save()
+        student = serializer.validated_data.get("student")
+        serializer.save(lab=getattr(student, "lab", None))
 
     def perform_update(self, serializer):
         batch = serializer.validated_data.get("batch", serializer.instance.batch)
         self._assert_trainer_batch_access(batch)
-        serializer.save()
+        student = serializer.validated_data.get("student", serializer.instance.student)
+        serializer.save(lab=getattr(student, "lab", None))
 
     @action(detail=False, methods=["post"], url_path="bulk-mark")
     def bulk_mark(self, request):
@@ -135,6 +150,11 @@ class StudentAttendanceViewSet(RoleScopedQuerysetMixin, viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        student_lab_map = {
+            student.id: student.lab
+            for student in Student.objects.select_related("lab").filter(pk__in=valid_student_ids)
+        }
+
         created_count = 0
         updated_count = 0
 
@@ -144,7 +164,11 @@ class StudentAttendanceViewSet(RoleScopedQuerysetMixin, viewsets.ModelViewSet):
                     student_id=record["student"],
                     date=date,
                     slot=slot,
-                    defaults={"batch": batch, "status": record["status"]},
+                    defaults={
+                        "batch": batch,
+                        "lab": student_lab_map.get(record["student"]),
+                        "status": record["status"],
+                    },
                 )
                 if created:
                     created_count += 1
@@ -214,3 +238,54 @@ class StudentAttendanceViewSet(RoleScopedQuerysetMixin, viewsets.ModelViewSet):
             )
 
         return Response(results)
+
+    @action(detail=False, methods=["get"], url_path="export")
+    def export(self, request):
+        queryset = self.filter_queryset(self.get_queryset())
+        workbook = Workbook()
+        worksheet = workbook.active
+        worksheet.title = "Attendance"
+        worksheet.append(
+            [
+                "Date",
+                "Batch",
+                "Lab",
+                "Trainer",
+                "Student",
+                "UG Number",
+                "Slot",
+                "Status",
+            ]
+        )
+
+        for record in queryset:
+            worksheet.append(
+                [
+                    record.date.isoformat(),
+                    record.batch.name if record.batch_id else "",
+                    record.lab.name if record.lab_id else "",
+                    record.lab.trainer.user.username if record.lab_id and record.lab and record.lab.trainer_id else "",
+                    record.student.name,
+                    record.student.ug_number,
+                    record.get_slot_display(),
+                    record.get_status_display(),
+                ]
+            )
+
+        output = BytesIO()
+        workbook.save(output)
+        output.seek(0)
+
+        filename_parts = [
+            "attendance",
+            request.query_params.get("batch") or "all-batches",
+            request.query_params.get("date") or "all-dates",
+        ]
+        filename = "-".join(filename_parts) + ".xlsx"
+
+        response = HttpResponse(
+            output.getvalue(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response
